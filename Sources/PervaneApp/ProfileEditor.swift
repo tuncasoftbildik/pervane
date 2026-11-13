@@ -93,7 +93,7 @@ struct CurveEditor: View {
         .chartYScale(domain: 0...100)
         .chartXAxis { AxisMarks(values: [40, 60, 80, 100]) { v in
             AxisGridLine()
-            AxisValueLabel { Text("\(v.as(Int.self) ?? 0)°") }
+            AxisValueLabel(collisionResolution: .disabled) { Text("\(v.as(Int.self) ?? 0)°").fixedSize() }
         } }
         .chartYAxis { AxisMarks(values: [0, 50, 100]) { v in
             AxisGridLine()

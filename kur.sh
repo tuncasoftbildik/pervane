@@ -19,9 +19,10 @@ fi
 
 echo "Uygulama paketleniyor: $APP"
 pkill -x Pervane 2>/dev/null || true
-rm -rf dist && mkdir -p dist/Pervane.app/Contents/MacOS
+rm -rf dist && mkdir -p dist/Pervane.app/Contents/MacOS dist/Pervane.app/Contents/Resources
 cp "$BIN/PervaneApp" dist/Pervane.app/Contents/MacOS/Pervane
 cp Paket/Info.plist dist/Pervane.app/Contents/Info.plist
+cp Paket/Pervane.icns dist/Pervane.app/Contents/Resources/Pervane.icns
 codesign --force --sign - dist/Pervane.app
 mkdir -p "$HOME/Applications" && rm -rf "$APP" && cp -R dist/Pervane.app "$APP"
 
