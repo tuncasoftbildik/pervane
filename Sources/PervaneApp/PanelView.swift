@@ -127,9 +127,10 @@ struct PanelView: View {
     private var notConnected: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Servis çalışmıyor", systemImage: "bolt.slash").font(.headline)
-            Text("Fanı arka plandaki Pervane servisi sürer. Kurmak için Terminal'de:")
+            Text("Fanı arka plandaki Pervane servisi sürer. Kurulum için:")
                 .font(.callout)
-            Text("~/Developer/pervane/kur.sh").font(.system(.callout, design: .monospaced)).textSelection(.enabled)
+            Link("github.com/tuncasoftbildik/pervane", destination: URL(string: "https://github.com/tuncasoftbildik/pervane#install")!)
+                .font(.callout)
             HStack {
                 Spacer()
                 Button("Çık") { NSApplication.shared.terminate(nil) }

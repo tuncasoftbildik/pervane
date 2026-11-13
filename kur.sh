@@ -4,9 +4,6 @@
 set -euo pipefail
 cd "${0:A:h}"
 
-LABEL=com.tunca.pervaned
-DAEMON=/Library/PrivilegedHelperTools/$LABEL
-PLIST=/Library/LaunchDaemons/$LABEL.plist
 APP="$HOME/Applications/Pervane.app"
 
 echo "Derleniyor…"
@@ -24,54 +21,15 @@ echo "Uygulama paketleniyor: $APP"
 pkill -x Pervane 2>/dev/null || true
 rm -rf dist && mkdir -p dist/Pervane.app/Contents/MacOS
 cp "$BIN/PervaneApp" dist/Pervane.app/Contents/MacOS/Pervane
-cat > dist/Pervane.app/Contents/Info.plist <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleIdentifier</key><string>com.tunca.pervane</string>
-  <key>CFBundleName</key><string>Pervane</string>
-  <key>CFBundleExecutable</key><string>Pervane</string>
-  <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>
-  <key>CFBundleVersion</key><string>1</string>
-  <key>LSMinimumSystemVersion</key><string>14.0</string>
-  <key>LSUIElement</key><true/>
-</dict>
-</plist>
-PLIST
+cp Paket/Info.plist dist/Pervane.app/Contents/Info.plist
 codesign --force --sign - dist/Pervane.app
 mkdir -p "$HOME/Applications" && rm -rf "$APP" && cp -R dist/Pervane.app "$APP"
 
 mkdir -p "$HOME/bin" && cp "$BIN/pervane" "$HOME/bin/pervane"
 
-# Root adımları tek betikte, tek parola sorusuyla.
-ROOT=$(mktemp -t pervane-kur)
-cat > "$ROOT" <<ROOTSH
-#!/bin/sh
-set -e
-launchctl bootout system/$LABEL 2>/dev/null || true
-install -o root -g wheel -m 755 "$BIN/pervaned" "$DAEMON"
-cat > "$PLIST" <<P
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key><string>$LABEL</string>
-  <key>ProgramArguments</key>
-  <array><string>$DAEMON</string><string>--uid</string><string>$(id -u)</string></array>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
-  <key>StandardErrorPath</key><string>/var/log/pervaned.log</string>
-</dict>
-</plist>
-P
-chown root:wheel "$PLIST" && chmod 644 "$PLIST"
-launchctl bootstrap system "$PLIST"
-ROOTSH
+# Root adımı tek betikte, tek parola sorusuyla.
 echo "Servis kuruluyor (yönetici parolası sorulacak)…"
-osascript -e "do shell script \"/bin/sh '$ROOT'\" with administrator privileges"
-rm -f "$ROOT"
+osascript -e "do shell script \"/bin/sh '$PWD/servis.sh' kur '$BIN/pervaned' $(id -u)\" with administrator privileges"
 
 sleep 6
 open "$APP"

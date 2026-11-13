@@ -1,0 +1,44 @@
+name: Sensör raporu / Sensor report
+description: Pervane'nin senin Mac'inde neyi gördüğünü paylaş / Share what Pervane sees on your Mac
+title: "Sensör raporu: <Mac modeli / Mac model>"
+labels: ["uyumluluk", "compatibility"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Teşekkürler! Bu komutlar root istemez ve hiçbir şeyi değiştirmez.
+        Thanks! These commands need no root and change nothing.
+
+        ```sh
+        git clone https://github.com/tuncasoftbildik/pervane.git && cd pervane
+        sysctl -n hw.model
+        sw_vers -productVersion
+        swift run pervane sensor
+        ```
+  - type: input
+    id: model
+    attributes:
+      label: Mac modeli / Mac model
+      description: "`sysctl -n hw.model` çıktısı ve pazarlama adı / output plus marketing name"
+      placeholder: "Mac14,6 — MacBook Pro 16\" M2 Max"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS sürümü / macOS version
+      placeholder: "15.3"
+    validations:
+      required: true
+  - type: textarea
+    id: sensor
+    attributes:
+      label: "`swift run pervane sensor` çıktısı / output"
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notlar / Notes
+      description: "Değerler Macs Fan Control, iStat vb. ile tutuyor mu? / Do the values match other tools?"

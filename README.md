@@ -1,62 +1,86 @@
 <p align="center">
-  <img src="docs/afis.svg" alt="Pervane: macOS için açık kaynak fan kontrolü" width="100%">
+  <img src="docs/banner.svg" alt="Pervane: open-source fan control for macOS" width="100%">
 </p>
 
 <p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-0b1020"></a>
   <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-0b1020?logo=apple&logoColor=white">
   <img alt="Swift 5.9+" src="https://img.shields.io/badge/Swift-5.9%2B-F05138?logo=swift&logoColor=white">
-  <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-M1%27de%20denendi-6366f1">
-  <img alt="Bağımlılık yok" src="https://img.shields.io/badge/ba%C4%9F%C4%B1ml%C4%B1l%C4%B1k-yok-22c55e">
-  <img alt="Testler" src="https://img.shields.io/badge/testler-7%20ye%C5%9Fil-22c55e">
+  <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-tested%20on%20M1-6366f1">
+  <img alt="No dependencies" src="https://img.shields.io/badge/dependencies-none-22c55e">
 </p>
 
 <p align="center">
-  <b>Mac'inin fanını sen yönet.</b><br>
-  Sıcaklık eğrileri, profiller, otomatik geçiş kuralları; menü çubuğunda, komut satırında.<br>
-  <sub>An open-source fan controller for macOS: temperature curves, profiles and auto-switch rules, with a menu bar app and a CLI. Docs are in Turkish.</sub>
+  <b>Take control of your Mac's fan.</b><br>
+  Temperature curves, profiles and auto-switch rules, from the menu bar or the command line.<br>
+  <sub><a href="README.tr.md">Türkçe</a> · English</sub>
 </p>
+
+<p align="center">
+  <img src="docs/panel.png" alt="Pervane menu bar panel: CPU temperature, fan speed, 30-minute history and profiles" width="340">
+  &nbsp;&nbsp;
+  <img src="docs/egri-duzenleyici.png" alt="Pervane curve editor in dark mode: draggable temperature-to-fan-speed points" width="340">
+</p>
+
+<p align="center"><sub>Live captures from a MacBook Pro M1. The interface is in Turkish for now (<i>pervane</i> means "propeller"); see the <a href="#glossary">glossary</a>.</sub></p>
 
 ---
 
-## Neden Pervane?
+## Why Pervane?
 
-macOS fanı geç devreye sokar; Mac önce ısınır, sonra soğur. Pervane fanı senin çizdiğin eğriye göre sürer, Docker açılınca kendiliğinden serin profile geçer, pile düşünce susar. Hepsi 1.700 satırın altında, dış bağımlılığı olmayan Swift.
+macOS spins the fan up late: the Mac heats up first, then cools down. Pervane drives the fan along a curve you draw, switches to a cooler profile on its own when Docker starts, and goes quiet on battery. It's all under 1,700 lines of Swift with no external dependencies.
 
 | | |
 |---|---|
-| 📈 **Sürüklenebilir fan eğrisi** | Noktaları fareyle taşı; sıcaklık → devir yüzdesi. Profil başına 12 noktaya kadar. |
-| 🎚️ **Dört kip** | Sistem, Sabit, Eğri, Tam güç. |
-| 🔀 **Otomatik geçiş** | "Şu uygulama çalışırken" ve "pilde" kuralları; ilk tutan kazanır. |
-| 🚨 **Acil durum freni** | Eşik aşılınca profil ne olursa olsun tam güç; 8 °C soğuyana kadar bırakmaz. |
-| 🧈 **Yumuşak geçiş** | Tur başına en çok 600 devir; histerezis bandı sayesinde fan inip çıkıp durmaz. |
-| 📊 **30 dakikalık geçmiş** | Menü çubuğu panelinde sıcaklık grafiği. |
-| ⌨️ **Komut satırı** | `pervane`, `pervane izle`, betikler için `pervane json`. |
-| 🛟 **Güvenli kapanış** | Servis dursa da çökse de fan sisteme geri verilir. |
+| 📈 **Draggable fan curve** | Move points with the mouse: temperature → fan speed. Up to 12 points per profile. |
+| 🎚️ **Four modes** | System, Fixed, Curve, Full power. |
+| 🔀 **Auto-switching** | "While this app is running" and "on battery" rules; the first match wins. |
+| 🚨 **Emergency brake** | Above a threshold the fan goes to full power whatever the profile, and stays there until things cool down by 8 °C. |
+| 🧈 **Smooth ramps** | At most 600 RPM change per tick; a hysteresis band keeps the fan from hunting up and down. |
+| 📊 **30-minute history** | Temperature chart right in the menu bar panel. |
+| ⌨️ **Command line** | `pervane`, `pervane izle` (watch), `pervane json` for scripts. |
+| 🛟 **Safe shutdown** | Whether the service stops or crashes, the fan is handed back to macOS. |
 
-## Kurulum
+Pervane is free and open source. Other fan control apps for Mac are either paid (TG Pro, Macs Fan Control Pro) or unmaintained (smcFanControl).
 
-Gerekenler: macOS 14 veya üstü, Xcode Komut Satırı Araçları (`xcode-select --install`).
+## Install
+
+Requirements: macOS 14 or later and the Xcode Command Line Tools (`xcode-select --install`). Apple Silicon is tested; Intel has a code path but hasn't been tried yet.
+
+### Option A: install script
 
 ```sh
 git clone https://github.com/tuncasoftbildik/pervane.git ~/Developer/pervane
 cd ~/Developer/pervane
-./kur.sh
+./kur.sh          # "kur" = install
 ```
 
-`kur.sh` derler, yönetici parolasını **bir kez** sorar ve üç parçayı kurar:
+`kur.sh` builds everything, asks for your admin password **once**, and installs three pieces:
 
-| Parça | Yer | İş |
+| Piece | Location | Job |
 |---|---|---|
-| `pervaned` | `/Library/PrivilegedHelperTools/com.tunca.pervaned` | Fanı süren servis (root, launchd) |
-| Pervane.app | `~/Applications/Pervane.app` | Menü çubuğu paneli |
-| `pervane` | `~/bin/pervane` | Komut satırı aracı |
+| `pervaned` | `/Library/PrivilegedHelperTools/com.tunca.pervaned` | Service that drives the fan (root, launchd) |
+| Pervane.app | `~/Applications/Pervane.app` | Menu bar panel |
+| `pervane` | `~/bin/pervane` | Command-line tool |
+
+To uninstall, run `./kaldir.sh`. The fan goes back to macOS and your settings file is left in place.
+
+### Option B: Homebrew
+
+Homebrew builds Pervane from source on your Mac:
+
+```sh
+brew install tuncasoftbildik/tap/pervane
+sudo "$(brew --prefix pervane)/libexec/servis.sh" kur "$(brew --prefix pervane)/libexec/pervaned"
+open "$(brew --prefix pervane)/Pervane.app"
+```
+
+The second line installs the root service. After `brew upgrade pervane`, run it again so the service picks up the new build. To remove the service: `sudo "$(brew --prefix pervane)/libexec/servis.sh" kaldir`.
 
 > [!NOTE]
-> Macs Fan Control açıksa `kur.sh` onu kapatır: iki program aynı fana yazarsa birbirini ezer.
+> Quit Macs Fan Control (or any other fan tool) first. If two programs write to the same fan they keep overriding each other. `kur.sh` quits Macs Fan Control for you.
 
-Kaldırmak için `./kaldir.sh`. Fan sisteme döner, ayar dosyan yerinde kalır.
-
-## Kullanım
+## Usage
 
 ```console
 $ pervane
@@ -64,128 +88,139 @@ Profil    Dengeli (seçili profil)
 İşlemci   64 °C   Yonga 53 °C   Pil 32 °C
 Fan 1     2915 dev/dk (%28)  kip: elle  hedef 2909
 Güç       adaptör
-
-$ pervane profiller
-  Sistem: Sistem
-  Sessiz: Eğri (55°→%0, 75°→%25, 88°→%60, 96°→%100)
-* Dengeli: Eğri (45°→%0, 65°→%30, 80°→%65, 90°→%100)
-  Serin: Eğri (40°→%15, 55°→%45, 70°→%80, 80°→%100)
-  Tam güç: Tam güç
-  kural: "com.docker" çalışırken → Serin
-  kural: pilde → Sessiz
 ```
 
-| Komut | Ne yapar |
+That reads: profile *Balanced* (selected), CPU 64 °C, SoC 53 °C, battery 32 °C, fan at 2915 RPM (28 %) under manual control with a 2909 RPM target, on AC power.
+
+| Command | What it does |
 |---|---|
-| `pervane` | Durum: profil, sıcaklıklar, fan devri |
-| `pervane profil <ad>` | Profili seçer |
-| `pervane profiller` | Profilleri ve kuralları listeler |
-| `pervane izle` | Durumu 2 saniyede bir yeniler |
-| `pervane json` | Ham durum (betikler için) |
-| `pervane sensor` | Servis olmadan doğrudan SMC'den okur; root istemez |
+| `pervane` | Status: profile, temperatures, fan speed |
+| `pervane profil <name>` | Select a profile |
+| `pervane profiller` | List profiles and rules |
+| `pervane izle` | Refresh the status every 2 seconds |
+| `pervane json` | Raw status for scripts |
+| `pervane sensor` | Read directly from the SMC without the service; no root needed |
 
-### Hazır profiller
+### Built-in profiles
 
-Yüzde, fanın en düşük ve en yüksek devri arasındaki konumdur: %0 en düşük devir, %100 en yüksek.
+Percentages are positions between the fan's minimum and maximum speed: 0 % is the minimum RPM, 100 % the maximum.
 
-| Profil | Kip | Eğri | Bant |
+| Profile | Mode | Curve | Band |
 |---|---|---|---|
-| **Sistem** | Sistem | macOS yönetir | – |
-| **Sessiz** | Eğri | 55° → %0 · 75° → %25 · 88° → %60 · 96° → %100 | 6 °C |
-| **Dengeli** *(varsayılan)* | Eğri | 45° → %0 · 65° → %30 · 80° → %65 · 90° → %100 | 4 °C |
-| **Serin** | Eğri | 40° → %15 · 55° → %45 · 70° → %80 · 80° → %100 | 3 °C |
-| **Tam güç** | Tam güç | Hep %100 | – |
+| **Sistem** (System) | System | macOS decides | – |
+| **Sessiz** (Quiet) | Curve | 55° → 0 % · 75° → 25 % · 88° → 60 % · 96° → 100 % | 6 °C |
+| **Dengeli** (Balanced, *default*) | Curve | 45° → 0 % · 65° → 30 % · 80° → 65 % · 90° → 100 % | 4 °C |
+| **Serin** (Cool) | Curve | 40° → 15 % · 55° → 45 % · 70° → 80 % · 80° → 100 % | 3 °C |
+| **Tam güç** (Full power) | Full power | Always 100 % | – |
 
-Kendi profilini panelden "Yeni Profil" ile ekle; eğriyi hangi sensörün süreceğini (İşlemci, Yonga, Pil, En sıcak) de oradan seç.
+To add your own profile, click "Yeni Profil" (New Profile) in the panel. There you also pick which sensor drives the curve: CPU, SoC, battery or the hottest of them.
 
-## Nasıl çalışır?
+## How it works
 
 ```mermaid
 flowchart LR
-    App["Pervane.app<br/>menü çubuğu"] -- JSON --> Sock
-    CLI["pervane<br/>komut satırı"] -- JSON --> Sock
-    Sock(["/var/run/pervane.sock<br/>yalnız sahibi bağlanır"]) --> D
+    App["Pervane.app<br/>menu bar"] -- JSON --> Sock
+    CLI["pervane<br/>CLI"] -- JSON --> Sock
+    Sock(["/var/run/pervane.sock<br/>owner-only"]) --> D
     subgraph root["root · launchd"]
-        D["pervaned<br/>2 sn'de bir karar"] --> C["Controller<br/>kural · eğri · histerezis · acil durum"]
+        D["pervaned<br/>decides every 2 s"] --> C["Controller<br/>rules · curve · hysteresis · emergency"]
     end
     D -- "F0Md · F0Tg" --> SMC[("AppleSMC")]
-    SMC -- "sıcaklık · devir" --> D
+    SMC -- "temperature · RPM" --> D
 ```
 
-Fana yazan tek yer `pervaned`. Arayüz ve komut satırı aracı yetkisiz çalışır; servisle Unix soketi üzerinden satır başına bir JSON ile konuşur.
+`pervaned` is the only thing that writes to the fan. The app and the CLI run unprivileged and talk to the service over a Unix socket, one JSON object per line.
 
-Her turda (2 saniye) olan:
+Each tick (2 seconds):
 
-1. **Oku.** SMC'den performans ve verimlilik çekirdekleri, yonga ve pil sıcaklıkları alınır.
-2. **Yumuşat.** Tek tük sıçramalar üstel ortalamayla yutulur; yükseliş hızlı, düşüş yavaş izlenir.
-3. **Profili seç.** Kurallar sırayla denenir; tutan yoksa seçili profil geçerlidir.
-4. **Karar ver.** Eğriden yüzde hesaplanır; sıcaklık histerezis bandı kadar düşmeden devir indirilmez.
-5. **Yaz.** Hedefe tur başına en çok 600 devirle yaklaşılır. Acil durumda beklenmez.
+1. **Read.** Performance and efficiency core, SoC and battery temperatures come from the SMC.
+2. **Smooth.** An exponential average absorbs one-off spikes; rises are followed quickly, drops slowly.
+3. **Pick a profile.** Rules are tried in order; if none matches, the selected profile applies.
+4. **Decide.** The curve gives a percentage; speed only drops once the temperature has fallen by the hysteresis band.
+5. **Write.** The target is approached by at most 600 RPM per tick. In an emergency there's no ramp.
 
-Karar mantığı (`PervaneCore/Controller.swift`) donanımdan bağımsızdır ve testlerle korunur:
+The decision logic (`PervaneCore/Controller.swift`) is hardware-independent and covered by tests:
 
 ```sh
 swift test
 ```
 
-### Kaynak düzeni
+### Source layout
 
 ```
 Sources/
-├── CSMC/          AppleSMC ile konuşan ince C katmanı
-├── PervaneCore/   SMC, sensör keşfi, ayar, karar mantığı, soket protokolü
-├── pervaned/      Servis: fanı süren tek yer
-├── pervane/       Komut satırı aracı
-└── PervaneApp/    SwiftUI menü çubuğu paneli (Swift Charts)
+├── CSMC/          Thin C layer that talks to AppleSMC
+├── PervaneCore/   SMC, sensor discovery, config, decision logic, socket protocol
+├── pervaned/      The service: the only writer to the fan
+├── pervane/       Command-line tool
+└── PervaneApp/    SwiftUI menu bar panel (Swift Charts)
 ```
 
-## Güvenlik
+## Safety
 
-Fan kontrolü donanıma dokunur; Pervane bunu şu önlemlerle yapar:
+Fan control touches hardware. Pervane guards it like this:
 
-- **Acil durum freni.** En sıcak sensör eşiğe (varsayılan 97 °C, 80–105 arası ayarlanır) ulaşınca fan tam güce çıkar. Bu karar yumuşatılmış değere değil ham ölçüme bakar.
-- **Kör sürüş yok.** Sensör okunamıyorsa fan sisteme bırakılır.
-- **Temiz kapanış.** `SIGTERM`, `SIGINT`, `SIGHUP` gelince fan sisteme geri verilir.
-- **Dar kapı.** Soket `0600` izinlidir ve yalnız kurulumu yapan kullanıcıya aittir.
-- **Sınırlanan ayar.** Root servise dışarıdan gelen her ayar güvenli aralıklara çekilir (profil ve nokta sayısı, sıcaklık, yüzde).
+- **Emergency brake.** When the hottest sensor reaches the threshold (97 °C by default, adjustable from 80 to 105), the fan goes to full power. This check uses the raw reading, not the smoothed one.
+- **No driving blind.** If a sensor can't be read, the fan is handed back to macOS.
+- **Clean exit.** On `SIGTERM`, `SIGINT` or `SIGHUP` the fan is handed back to macOS.
+- **Narrow door.** The socket is mode `0600` and owned only by the user who installed Pervane.
+- **Clamped settings.** Every setting that reaches the root service from outside is clamped to safe ranges (number of profiles and points, temperatures, percentages).
 
-Fana yazmadan denemek için kuru çalışma (root istemez):
+To try it without writing to the fan, use a dry run (no root needed):
 
 ```sh
-# 1. terminal: servis, SMC'ye yazmadan
+# terminal 1: the service, without writing to the SMC
 PERVANE_SOCKET=/tmp/pervane.sock swift run pervaned --kuru --ayar /tmp/ayar.json
 
-# 2. terminal: ona bağlanan komut satırı aracı
+# terminal 2: the CLI, connected to it
 PERVANE_SOCKET=/tmp/pervane.sock swift run pervane
 ```
 
 > [!WARNING]
-> Pervane, Apple'ın belgelemediği SMC arayüzüne root yetkisiyle yazar. Çok düşük bir eğri Mac'ini gereğinden sıcak çalıştırabilir. Kullanım sorumluluğu sana aittir.
+> Pervane writes to Apple's undocumented SMC interface with root privileges. A curve set too low can run your Mac hotter than necessary. Use at your own risk.
 
-## Uyumluluk
+## Compatibility
 
-| Donanım | Durum |
+| Hardware | Status |
 |---|---|
-| MacBook Pro M1 (MacBookPro17,1), macOS 27 | ✅ Denendi |
-| Diğer Apple Silicon Mac'ler | 🟡 Sensör adları için yedek kalıplar var, denenmedi |
-| Intel Mac'ler | 🟡 Kod yolu var (`TC0P` türü anahtarlar, `fpe2`), denenmedi |
-| Fansız Mac'ler (MacBook Air M1 ve sonrası) | ❌ Sürülecek fan yok |
+| MacBook Pro M1 (MacBookPro17,1), macOS 27 | ✅ Tested |
+| Other Apple Silicon Macs | 🟡 Fallback sensor patterns exist, not yet tested |
+| Intel Macs | 🟡 Code path exists (`TC0P`-style keys, `fpe2`), not yet tested |
+| Fanless Macs (MacBook Air M1 and later) | ❌ No fan to drive |
 
-Kendi makinende hangi sensörlerin görüldüğüne root olmadan bakabilirsin:
+**Help wanted:** if you have an M2, M3, M4 or Intel Mac, run the command below and [share the output](https://github.com/tuncasoftbildik/pervane/issues/new?template=sensor-raporu.yml). It needs no root and changes nothing.
 
 ```sh
 swift run pervane sensor
 ```
 
-## Dosyalar
+## Files
 
-| Yol | İçerik |
+| Path | Contents |
 |---|---|
-| `/Library/Application Support/Pervane/ayar.json` | Profiller, kurallar, acil durum eşiği |
-| `/var/run/pervane.sock` | Servis soketi (`PERVANE_SOCKET` ile değişir) |
-| `/var/log/pervaned.log` | Servis kaydı: profil değişimleri, hatalar |
-| `/Library/LaunchDaemons/com.tunca.pervaned.plist` | launchd tanımı |
+| `/Library/Application Support/Pervane/ayar.json` | Profiles, rules, emergency threshold |
+| `/var/run/pervane.sock` | Service socket (override with `PERVANE_SOCKET`) |
+| `/var/log/pervaned.log` | Service log: profile changes, errors |
+| `/Library/LaunchDaemons/com.tunca.pervaned.plist` | launchd definition |
+
+## Glossary
+
+The interface and CLI are in Turkish for now. Pull requests for localization are welcome.
+
+| Turkish | English |
+|---|---|
+| İşlemci · Yonga · Pil | CPU · SoC · Battery |
+| dev/dk · hedef | RPM · target |
+| Profil · Kip · Eğri · Sabit · Tam güç | Profile · Mode · Curve · Fixed · Full power |
+| Sessiz · Dengeli · Serin | Quiet · Balanced · Cool |
+| Otomatik Geçiş · Pil Kuralı Ekle | Auto-switch · Add battery rule |
+| Acil durum eşiği · Bant | Emergency threshold · Hysteresis band |
+| kur · kaldır · izle | install · uninstall · watch |
+
+## License
+
+[MIT](LICENSE)
 
 ---
 
-<p align="center"><sub>Sıcak bir MacBook'un başında yazıldı. 🌀</sub></p>
+<p align="center"><sub>Written next to a hot MacBook. 🌀</sub></p>
