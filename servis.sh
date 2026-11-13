@@ -27,6 +27,7 @@ kur)
     echo "Uyarı: Macs Fan Control açık. İki program aynı fana yazarsa birbirini ezer; onu kapat." >&2
   fi
   launchctl bootout "system/$LABEL" 2>/dev/null || true
+  rm -f "$SOCK"  # eski soket sağlık kontrolünü yanıltmasın
   mkdir -p "$(dirname "$DAEMON")"
   install -o root -g wheel -m 755 "$SRC" "$DAEMON"
   cat > "$PLIST" <<P
@@ -46,6 +47,16 @@ P
   chown root:wheel "$PLIST"
   chmod 644 "$PLIST"
   launchctl bootstrap system "$PLIST"
+  # Servis ayağa kalkıp soketi açmazsa (ör. fansız Mac) geri al; launchd'nin sonsuz yeniden başlatmasına bırakma.
+  i=0
+  while [ ! -S "$SOCK" ] && [ $i -lt 10 ]; do sleep 1; i=$((i + 1)); done
+  if [ ! -S "$SOCK" ]; then
+    echo "Servis başlamadı; geri alınıyor. Son kayıt:" >&2
+    tail -3 /var/log/pervaned.log >&2 2>/dev/null || true
+    launchctl bootout "system/$LABEL" 2>/dev/null || true
+    rm -f "$PLIST" "$DAEMON"
+    exit 1
+  fi
   echo "Servis kuruldu: $DAEMON"
   ;;
 kaldir)

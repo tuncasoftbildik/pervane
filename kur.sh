@@ -10,6 +10,12 @@ echo "Derleniyor…"
 swift build -c release 2>&1 | tail -1
 BIN=$(swift build -c release --show-bin-path)
 
+# Fansız Mac'te (MacBook Air) sürülecek bir şey yok; servis kurulursa durmadan yeniden başlar.
+if ! "$BIN/pervane" sensor 2>/dev/null | grep -q '^Fan '; then
+  echo "Bu Mac'te fan bulunamadı (fansız model olabilir); kurulum yapılmadı."
+  exit 1
+fi
+
 # İki program aynı fana yazarsa birbirini ezer.
 if pgrep -xq "Macs Fan Control"; then
   echo "Macs Fan Control kapatılıyor (fan sisteme döner)…"
