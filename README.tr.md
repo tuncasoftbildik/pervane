@@ -72,7 +72,9 @@ Kaldırmak için `./kaldir.sh`. Fan sisteme döner, ayar dosyan yerinde kalır.
 Homebrew, Pervane'yi kendi Mac'inde kaynaktan derler:
 
 ```sh
-brew install tuncasoftbildik/tap/pervane
+brew tap tuncasoftbildik/tap
+brew trust tuncasoftbildik/tap   # Homebrew 7 ve sonrası üçüncü taraf tap için onay ister
+brew install pervane
 sudo "$(brew --prefix pervane)/libexec/servis.sh" kur "$(brew --prefix pervane)/libexec/pervaned"
 open "$(brew --prefix pervane)/Pervane.app"
 ```

@@ -70,7 +70,9 @@ To uninstall, run `./kaldir.sh`. The fan goes back to macOS and your settings fi
 Homebrew builds Pervane from source on your Mac:
 
 ```sh
-brew install tuncasoftbildik/tap/pervane
+brew tap tuncasoftbildik/tap
+brew trust tuncasoftbildik/tap   # Homebrew 7+ asks you to trust third-party taps
+brew install pervane
 sudo "$(brew --prefix pervane)/libexec/servis.sh" kur "$(brew --prefix pervane)/libexec/pervaned"
 open "$(brew --prefix pervane)/Pervane.app"
 ```
