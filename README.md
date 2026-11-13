@@ -41,7 +41,7 @@ macOS spins the fan up late: the Mac heats up first, then cools down. Pervane dr
 | ⌨️ **Command line** | `pervane`, `pervane izle` (watch), `pervane json` for scripts. |
 | 🛟 **Safe shutdown** | Whether the service stops or crashes, the fan is handed back to macOS. |
 
-Pervane is free and open source. Other fan control apps for Mac are either paid (TG Pro, Macs Fan Control Pro) or unmaintained (smcFanControl).
+Pervane is free and MIT-licensed. It's built around two ideas: a fan that doesn't hunt up and down (hysteresis, ramp limits, smoothing), and a root helper small enough to read in one sitting.
 
 ## Install
 
