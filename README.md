@@ -6,7 +6,7 @@
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-0b1020"></a>
   <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-0b1020?logo=apple&logoColor=white">
   <img alt="Swift 5.9+" src="https://img.shields.io/badge/Swift-5.9%2B-F05138?logo=swift&logoColor=white">
-  <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-tested%20on%20M1-6366f1">
+  <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-tested%20on%20M1%20%7C%20M5%20Pro-6366f1">
   <img alt="No dependencies" src="https://img.shields.io/badge/dependencies-none-22c55e">
 </p>
 
@@ -46,6 +46,12 @@ Pervane is free and MIT-licensed. It's built around two ideas: a fan that doesn'
 ## Install
 
 Requirements: macOS 14 or later and the Xcode Command Line Tools (`xcode-select --install`). Apple Silicon is tested; Intel has a code path but hasn't been tried yet.
+
+> [!TIP]
+> If the build fails with `plugin for module 'SwiftUIMacros' not found`, your Command Line Tools SDK (27.2) lacks SwiftUI's macro plugin and full Xcode isn't installed. Build against an older SDK instead:
+> ```sh
+> SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk ./kur.sh
+> ```
 
 ### Option A: install script
 
@@ -186,6 +192,7 @@ PERVANE_SOCKET=/tmp/pervane.sock swift run pervane
 | Hardware | Status |
 |---|---|
 | MacBook Pro M1 (MacBookPro17,1), macOS 27 | ✅ Tested |
+| MacBook Pro M5 Pro (Mac17,9), macOS 27 | ✅ Tested (two fans; mode key is `F0md`, no `Ftst`) |
 | Other Apple Silicon Macs | 🟡 Fallback sensor patterns exist, not yet tested |
 | Intel Macs | 🟡 Code path exists (`TC0P`-style keys, `fpe2`), not yet tested |
 | Fanless Macs (MacBook Air M1 and later) | ❌ No fan to drive |

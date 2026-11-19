@@ -6,7 +6,7 @@
   <a href="LICENSE"><img alt="Lisans: MIT" src="https://img.shields.io/badge/lisans-MIT-0b1020"></a>
   <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-0b1020?logo=apple&logoColor=white">
   <img alt="Swift 5.9+" src="https://img.shields.io/badge/Swift-5.9%2B-F05138?logo=swift&logoColor=white">
-  <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-M1%27de%20denendi-6366f1">
+  <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-M1%20%7C%20M5%20Pro%27da%20denendi-6366f1">
   <img alt="Bağımlılık yok" src="https://img.shields.io/badge/ba%C4%9F%C4%B1ml%C4%B1l%C4%B1k-yok-22c55e">
   <img alt="Testler" src="https://img.shields.io/badge/testler-7%20ye%C5%9Fil-22c55e">
 </p>
@@ -45,6 +45,12 @@ macOS fanı geç devreye sokar; Mac önce ısınır, sonra soğur. Pervane fanı
 ## Kurulum
 
 Gerekenler: macOS 14 veya üstü, Xcode Komut Satırı Araçları (`xcode-select --install`).
+
+> [!TIP]
+> Derleme `plugin for module 'SwiftUIMacros' not found` hatasıyla durursa Komut Satırı Araçları'nın SDK'sında (27.2) SwiftUI makro eklentisi yok demektir ve tam Xcode kurulu değildir. Bir önceki SDK ile derle:
+> ```sh
+> SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk ./kur.sh
+> ```
 
 ### A yolu: kurulum betiği
 
@@ -192,6 +198,7 @@ PERVANE_SOCKET=/tmp/pervane.sock swift run pervane
 | Donanım | Durum |
 |---|---|
 | MacBook Pro M1 (MacBookPro17,1), macOS 27 | ✅ Denendi |
+| MacBook Pro M5 Pro (Mac17,9), macOS 27 | ✅ Denendi (iki fan; kip anahtarı `F0md`, `Ftst` yok) |
 | Diğer Apple Silicon Mac'ler | 🟡 Sensör adları için yedek kalıplar var, denenmedi |
 | Intel Mac'ler | 🟡 Kod yolu var (`TC0P` türü anahtarlar, `fpe2`), denenmedi |
 | Fansız Mac'ler (MacBook Air M1 ve sonrası) | ❌ Sürülecek fan yok |

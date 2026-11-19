@@ -66,12 +66,15 @@ public final class Hardware {
     private let batteryKeys: [String]
     /// Eski Apple Silicon sürümlerinde elle kontrolün kilidini açan anahtar; yoksa nil.
     private let hasFtst: Bool
+    /// Fan kip anahtarı: M1'de "F0Md", M5 Pro / macOS 27'de "F0md".
+    private let modeKeyLower: Bool
 
     public init?() {
         guard let smc = SMC() else { return nil }
         self.smc = smc
         fanCount = Int(smc.number("FNum") ?? 0)
         hasFtst = smc.read("Ftst") != nil
+        modeKeyLower = smc.read("F0Md") == nil && smc.read("F0md") != nil
 
         let tKeys = smc.allKeys().filter { $0.hasPrefix("T") && smc.read($0)?.type == "flt " }
         func pick(_ pattern: String) -> [String] {
@@ -88,6 +91,8 @@ public final class Hardware {
         batteryKeys = pick("^TB[0-9]T$")
     }
 
+    private func modeKey(_ i: Int) -> String { modeKeyLower ? "F\(i)md" : "F\(i)Md" }
+
     private func hottest(_ keys: [String]) -> Double? {
         keys.compactMap { smc.number($0) }.filter { $0 > 1 && $0 < 130 }.max()
     }
@@ -103,7 +108,7 @@ public final class Hardware {
                   let hi = smc.number("F\(i)Mx") else { return nil }
             return FanState(rpm: rpm, min: lo, max: hi,
                             target: smc.number("F\(i)Tg") ?? 0,
-                            manual: (smc.number("F\(i)Md") ?? 0) != 0)
+                            manual: (smc.number(modeKey(i)) ?? 0) != 0)
         }
     }
 
@@ -111,14 +116,14 @@ public final class Hardware {
     @discardableResult
     public func setTarget(fan i: Int, rpm: Double) -> Bool {
         if hasFtst, smc.number("Ftst") != 1 { smc.write("Ftst", 1) }
-        if smc.number("F\(i)Md") != 1, !smc.write("F\(i)Md", 1) { return false }
+        if smc.number(modeKey(i)) != 1, !smc.write(modeKey(i), 1) { return false }
         return smc.write("F\(i)Tg", rpm)
     }
 
     /// Fanı sisteme geri verir.
     @discardableResult
     public func setAuto(fan i: Int) -> Bool {
-        let ok = smc.number("F\(i)Md") == 0 || smc.write("F\(i)Md", 0)
+        let ok = smc.number(modeKey(i)) == 0 || smc.write(modeKey(i), 0)
         if hasFtst, smc.number("Ftst") != 0 { smc.write("Ftst", 0) }
         return ok
     }
