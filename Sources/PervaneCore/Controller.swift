@@ -27,24 +27,45 @@ public struct Controller {
         self.config = config
     }
 
-    public func effectiveProfile(onBattery: Bool, processes: [String]) -> (Profile, String) {
+    /// Menüden elle seçilen profil kuralları ezer; kuralların durumu değişene kadar
+    /// (fiş takıldı/çekildi, kurallı uygulama açıldı/kapandı) geçerli kalır.
+    public private(set) var manualOverride = false
+    /// Son turda tutan kuralın kimliği; değişince elle seçim düşer.
+    private var lastRuleKey: String?
+
+    public mutating func selectManually(_ name: String) {
+        config.activeProfile = name
+        manualOverride = true
+    }
+
+    /// Tutan ilk kural (profil, gerekçe, kural kimliği).
+    func matchingRule(onBattery: Bool, processes: [String]) -> (Profile, String, String)? {
         for rule in config.rules where rule.enabled {
             guard let p = config.profile(named: rule.profile) else { continue }
             switch rule.kind {
             case .battery:
-                if onBattery { return (p, "pilde") }
+                if onBattery { return (p, "pilde", rule.id) }
             case .app:
                 let needle = rule.match.lowercased()
                 if processes.contains(where: { $0.lowercased().contains(needle) }) {
-                    return (p, "\(rule.match) çalışıyor")
+                    return (p, "\(rule.match) çalışıyor", rule.id)
                 }
             }
         }
-        let p = config.profile(named: config.activeProfile) ?? Profile(name: "Sistem", mode: .auto)
-        return (p, "seçili profil")
+        return nil
+    }
+
+    public func effectiveProfile(onBattery: Bool, processes: [String]) -> (Profile, String) {
+        let active = config.profile(named: config.activeProfile) ?? Profile(name: "Sistem", mode: .auto)
+        if manualOverride { return (active, "elle seçildi") }
+        if let (p, reason, _) = matchingRule(onBattery: onBattery, processes: processes) { return (p, reason) }
+        return (active, "seçili profil")
     }
 
     public mutating func decide(temps: Temps, onBattery: Bool, processes: [String]) -> Decision {
+        let key = matchingRule(onBattery: onBattery, processes: processes)?.2 ?? "-"
+        if let last = lastRuleKey, last != key { manualOverride = false }
+        lastRuleKey = key
         let (profile, reason) = effectiveProfile(onBattery: onBattery, processes: processes)
 
         // Acil durum: eşikte tam güç, 8 °C soğuyana kadar bırakma.

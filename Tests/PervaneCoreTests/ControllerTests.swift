@@ -80,4 +80,26 @@ final class ControllerTests: XCTestCase {
         XCTAssertEqual(ramp(from: 2000, to: 1000, maxStep: 500), 1500)
         XCTAssertEqual(ramp(from: 2000, to: 2200, maxStep: 500), 2200)
     }
+
+    func testManualSelectionBeatsBatteryRuleUntilPowerChanges() {
+        var c = Controller(config: config(active: "Eğri", rules: [Rule(kind: .battery, profile: "Sabit")]))
+        XCTAssertEqual(c.decide(temps: temps(60), onBattery: true, processes: []).profile, "Sabit")
+        c.selectManually("Tam")
+        let d = c.decide(temps: temps(60), onBattery: true, processes: [])
+        XCTAssertEqual(d.profile, "Tam")
+        XCTAssertEqual(d.percent, 100)
+        XCTAssertEqual(d.reason, "elle seçildi")
+        // Adaptöre takıldı: kural düştü, elle seçim de düşer ama seçili profil zaten Tam.
+        XCTAssertEqual(c.decide(temps: temps(60), onBattery: false, processes: []).profile, "Tam")
+        // Yeniden pile geçince kural tekrar devreye girer.
+        XCTAssertEqual(c.decide(temps: temps(60), onBattery: true, processes: []).profile, "Sabit")
+    }
+
+    func testManualSelectionMadeOnACDropsWhenUnplugged() {
+        var c = Controller(config: config(active: "Eğri", rules: [Rule(kind: .battery, profile: "Sabit")]))
+        _ = c.decide(temps: temps(60), onBattery: false, processes: [])
+        c.selectManually("Tam")
+        XCTAssertEqual(c.decide(temps: temps(60), onBattery: false, processes: []).profile, "Tam")
+        XCTAssertEqual(c.decide(temps: temps(60), onBattery: true, processes: []).profile, "Sabit")
+    }
 }

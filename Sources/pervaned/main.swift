@@ -133,7 +133,7 @@ func handle(_ req: Request) -> Status {
         guard let name = req.profile, controller.config.profile(named: name) != nil else {
             return status(error: "Böyle bir profil yok", withHistory: false)
         }
-        controller.config.activeProfile = name
+        controller.selectManually(name)
         saveConfig(controller.config)
         tick()
         return status()
