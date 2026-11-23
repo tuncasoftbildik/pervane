@@ -6,12 +6,15 @@ public struct Decision: Equatable {
     public var profile: String
     public var reason: String
     public var emergency: Bool
+    /// Eğri %0 verdiği için fan sisteme bırakıldı.
+    public var cool: Bool
 
-    public init(percent: Double?, profile: String, reason: String, emergency: Bool) {
+    public init(percent: Double?, profile: String, reason: String, emergency: Bool, cool: Bool = false) {
         self.percent = percent
         self.profile = profile
         self.reason = reason
         self.emergency = emergency
+        self.cool = cool
     }
 }
 
@@ -38,6 +41,11 @@ public struct Controller {
         manualOverride = true
     }
 
+    /// Elle seçimi bırakır; tutan kural varsa yeniden o geçerli olur.
+    public mutating func clearManual() {
+        manualOverride = false
+    }
+
     /// Tutan ilk kural (profil, gerekçe, kural kimliği).
     func matchingRule(onBattery: Bool, processes: [String]) -> (Profile, String, String)? {
         for rule in config.rules where rule.enabled {
@@ -46,8 +54,7 @@ public struct Controller {
             case .battery:
                 if onBattery { return (p, "pilde", rule.id) }
             case .app:
-                let needle = rule.match.lowercased()
-                if processes.contains(where: { $0.lowercased().contains(needle) }) {
+                if processes.contains(where: { $0.range(of: rule.match, options: .caseInsensitive) != nil }) {
                     return (p, "\(rule.match) çalışıyor", rule.id)
                 }
             }
@@ -55,18 +62,28 @@ public struct Controller {
         return nil
     }
 
-    public func effectiveProfile(onBattery: Bool, processes: [String]) -> (Profile, String) {
+    /// Şu an tutan kuralın profili ve gerekçesi; arayüz elle seçimin neyi ezdiğini göstersin diye.
+    public func ruleMatch(onBattery: Bool, processes: [String]) -> (profile: String, reason: String)? {
+        matchingRule(onBattery: onBattery, processes: processes).map { ($0.0.name, $0.1) }
+    }
+
+    private func resolve(_ match: (Profile, String, String)?) -> (Profile, String) {
         let active = config.profile(named: config.activeProfile) ?? Profile(name: "Sistem", mode: .auto)
         if manualOverride { return (active, "elle seçildi") }
-        if let (p, reason, _) = matchingRule(onBattery: onBattery, processes: processes) { return (p, reason) }
+        if let (p, reason, _) = match { return (p, reason) }
         return (active, "seçili profil")
     }
 
+    public func effectiveProfile(onBattery: Bool, processes: [String]) -> (Profile, String) {
+        resolve(matchingRule(onBattery: onBattery, processes: processes))
+    }
+
     public mutating func decide(temps: Temps, onBattery: Bool, processes: [String]) -> Decision {
-        let key = matchingRule(onBattery: onBattery, processes: processes)?.2 ?? "-"
+        let match = matchingRule(onBattery: onBattery, processes: processes)
+        let key = match?.2 ?? "-"
         if let last = lastRuleKey, last != key { manualOverride = false }
         lastRuleKey = key
-        let (profile, reason) = effectiveProfile(onBattery: onBattery, processes: processes)
+        let (profile, reason) = resolve(match)
 
         // Acil durum: eşikte tam güç, 8 °C soğuyana kadar bırakma.
         let hottest = temps.value(for: .hottest)
@@ -96,7 +113,13 @@ public struct Controller {
             } else {
                 held = t
             }
-            return Decision(percent: profile.percent(at: held ?? t), profile: profile.name, reason: reason, emergency: false)
+            let percent = profile.percent(at: held ?? t)
+            // Eğrinin dibinde fanı en düşük devirde tutmak yerine sisteme bırak. Histerezis burada da
+            // geçerli: sıcaklık bant kadar düşmeden %0'a inilmez, yani iki kip arasında gidip gelmez.
+            if config.releaseWhenCool, percent <= 0 {
+                return Decision(percent: nil, profile: profile.name, reason: reason, emergency: false, cool: true)
+            }
+            return Decision(percent: percent, profile: profile.name, reason: reason, emergency: false)
         }
     }
 }

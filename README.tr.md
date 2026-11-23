@@ -8,7 +8,7 @@
   <img alt="Swift 5.9+" src="https://img.shields.io/badge/Swift-5.9%2B-F05138?logo=swift&logoColor=white">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-M1%20%7C%20M5%20Pro%27da%20denendi-6366f1">
   <img alt="Bağımlılık yok" src="https://img.shields.io/badge/ba%C4%9F%C4%B1ml%C4%B1l%C4%B1k-yok-22c55e">
-  <img alt="Testler" src="https://img.shields.io/badge/testler-7%20ye%C5%9Fil-22c55e">
+  <img alt="Testler" src="https://img.shields.io/badge/testler-15%20ye%C5%9Fil-22c55e">
 </p>
 
 <p align="center">
@@ -18,27 +18,29 @@
 </p>
 
 <p align="center">
-  <img src="docs/panel.png" alt="Pervane menü çubuğu paneli: işlemci sıcaklığı, fan devri, 30 dakikalık geçmiş ve profiller" width="340">
+  <img src="docs/panel.png" alt="Pervane menü çubuğu paneli: sıcaklık ve fan halkaları, 30 dakikalık sıcaklık ve fan grafiği, profil seçici" width="340">
   &nbsp;&nbsp;
-  <img src="docs/egri-duzenleyici.png" alt="Koyu temada Pervane eğri düzenleyicisi: sürüklenebilir sıcaklık-devir noktaları" width="340">
+  <img src="docs/egri-duzenleyici.png" alt="Koyu temada Pervane profilleri ve eğri düzenleyicisi: sürüklenebilir noktalar, eğri üzerinde o anki sıcaklık" width="340">
 </p>
 
-<p align="center"><sub>MacBook Pro M1'den canlı görüntüler.</sub></p>
+<p align="center"><sub>MacBook Pro M5 Pro'dan canlı görüntüler.</sub></p>
 
 ---
 
 ## Neden Pervane?
 
-macOS fanı geç devreye sokar; Mac önce ısınır, sonra soğur. Pervane fanı senin çizdiğin eğriye göre sürer, Docker açılınca kendiliğinden serin profile geçer, pile düşünce susar. Hepsi 1.700 satırın altında, dış bağımlılığı olmayan Swift.
+macOS fanı geç devreye sokar; Mac önce ısınır, sonra soğur. Pervane fanı senin çizdiğin eğriye göre sürer, Docker açılınca kendiliğinden serin profile geçer, pile düşünce susar. Hepsi 2.600 satırın altında, dış bağımlılığı olmayan Swift; menü çubuğunda dururken işlemcinin %0,5'inden azını kullanır.
 
 | | |
 |---|---|
-| 📈 **Sürüklenebilir fan eğrisi** | Noktaları fareyle taşı; sıcaklık → devir yüzdesi. Profil başına 12 noktaya kadar. |
+| 📈 **Sürüklenebilir fan eğrisi** | Noktaları fareyle taşı, çift tıkla ekle ya da sil; o anki sıcaklık eğrinin üstünde görünür. Profil başına 12 noktaya kadar. |
 | 🎚️ **Dört kip** | Sistem, Sabit, Eğri, Tam güç. |
-| 🔀 **Otomatik geçiş** | "Şu uygulama çalışırken" ve "pilde" kuralları; ilk tutan kazanır. |
+| 🔀 **Otomatik geçiş** | "Şu uygulama çalışırken" ve "pilde" kuralları; ilk tutan kazanır. Uygulamayı açık olanlar listesinden seç. |
+| 🍃 **Soğukta sisteme bırakma** | Eğri %0 verdiğinde fan en düşük devirde tutulmaz, macOS'e bırakılır (ayarlardan kapatılır). |
 | 🚨 **Acil durum freni** | Eşik aşılınca profil ne olursa olsun tam güç; 8 °C soğuyana kadar bırakmaz. |
 | 🧈 **Yumuşak geçiş** | Tur başına en çok 600 devir; histerezis bandı sayesinde fan inip çıkıp durmaz. |
-| 📊 **30 dakikalık geçmiş** | Menü çubuğu panelinde sıcaklık grafiği. |
+| 📊 **30 dakikalık geçmiş** | Sıcaklık çizgisi ile fan yüzdesi aynı grafikte; üzerine gelince o anın değerleri. |
+| 🪶 **Sade menü çubuğu** | Simge, sıcaklık, yüzde ya da devir: hangisini görmek istediğini sen seç. Oturum açılınca kendiliğinden başlar. |
 | ⌨️ **Komut satırı** | `pervane`, `pervane izle`, betikler için `pervane json`. |
 | 🛟 **Güvenli kapanış** | Servis dursa da çökse de fan sisteme geri verilir. |
 
@@ -109,7 +111,8 @@ $ pervane profiller
 | Komut | Ne yapar |
 |---|---|
 | `pervane` | Durum: profil, sıcaklıklar, fan devri |
-| `pervane profil <ad>` | Profili seçer |
+| `pervane profil <ad>` | Profili seçer (kuralları ezer) |
+| `pervane otomatik` | Elle seçimi bırakır, kurallara döner |
 | `pervane profiller` | Profilleri ve kuralları listeler |
 | `pervane izle` | Durumu 2 saniyede bir yeniler |
 | `pervane json` | Ham durum (betikler için) |
@@ -127,7 +130,9 @@ Yüzde, fanın en düşük ve en yüksek devri arasındaki konumdur: %0 en düş
 | **Serin** | Eğri | 40° → %15 · 55° → %45 · 70° → %80 · 80° → %100 | 3 °C |
 | **Tam güç** | Tam güç | Hep %100 | – |
 
-Kendi profilini panelden "Yeni Profil" ile ekle; eğriyi hangi sensörün süreceğini (İşlemci, Yonga, Pil, En sıcak) de oradan seç.
+Kendi profilini panelin Profiller sekmesinden "Yeni Profil" ile ekle; adını, simgesini ve eğriyi hangi sensörün süreceğini (İşlemci, Yonga, Pil, En sıcak) de oradan seç.
+
+Eğri kipinde yüzde %0'a indiğinde fan macOS'e bırakılır; sıcaklık yeniden eğriye girince Pervane devralır. Fanı hep kendin sürmek istersen ayarlardan "Soğukken fanı sisteme bırak"ı kapat.
 
 ## Nasıl çalışır?
 
@@ -147,7 +152,7 @@ Fana yazan tek yer `pervaned`. Arayüz ve komut satırı aracı yetkisiz çalı�
 
 Her turda (2 saniye) olan:
 
-1. **Oku.** SMC'den performans ve verimlilik çekirdekleri, yonga ve pil sıcaklıkları alınır.
+1. **Oku.** SMC'den performans ve verimlilik çekirdekleri, yonga ve pil sıcaklıkları alınır. Anahtar bilgileri önbellekte durur; değişmeyen hedef fana yeniden yazılmaz.
 2. **Yumuşat.** Tek tük sıçramalar üstel ortalamayla yutulur; yükseliş hızlı, düşüş yavaş izlenir.
 3. **Profili seç.** Kurallar sırayla denenir; tutan yoksa seçili profil geçerlidir.
 4. **Karar ver.** Eğriden yüzde hesaplanır; sıcaklık histerezis bandı kadar düşmeden devir indirilmez.
@@ -213,7 +218,7 @@ swift run pervane sensor
 
 | Yol | İçerik |
 |---|---|
-| `/Library/Application Support/Pervane/ayar.json` | Profiller, kurallar, acil durum eşiği |
+| `/Library/Application Support/Pervane/ayar.json` | Profiller, kurallar, acil durum eşiği, soğukta bırakma |
 | `/var/run/pervane.sock` | Servis soketi (`PERVANE_SOCKET` ile değişir) |
 | `/var/log/pervaned.log` | Servis kaydı: profil değişimleri, hatalar |
 | `/Library/LaunchDaemons/com.tunca.pervaned.plist` | launchd tanımı |

@@ -5,7 +5,8 @@ let usage = """
 pervane: fan kontrolü
 
   pervane                 durum
-  pervane profil <ad>     profili seç
+  pervane profil <ad>     profili seç (kuralların önüne geçer)
+  pervane otomatik        elle seçimi bırak, kurallara dön
   pervane profiller       profilleri ve kuralları göster
   pervane izle            durumu 2 saniyede bir yenile
   pervane json            ham durum (betikler için)
@@ -27,12 +28,14 @@ func deg(_ v: Double?) -> String {
 
 func printStatus(_ s: Status) {
     print("Profil    \(s.profile) (\(s.reason))\(s.dryRun ? "  [kuru çalışma]" : "")")
+    if let pending = s.pendingRule { print("Bekleyen  \(pending) (pervane otomatik ile kurala dön)") }
     print("İşlemci   \(deg(s.temps.cpu))   Yonga \(deg(s.temps.soc))   Pil \(deg(s.temps.battery))")
     for (i, f) in s.fans.enumerated() {
         let pct = (f.rpm - f.min) / max(1, f.max - f.min) * 100
         let who = f.manual ? "elle" : "sistem"
         var line = "Fan \(i + 1)     \(Int(f.rpm)) dev/dk (%\(Int(max(0, pct))))  kip: \(who)"
         if let w = s.wantedRPM { line += "  hedef \(Int(w))" }
+        else if s.cool == true { line += "  soğuk, sisteme bırakıldı" }
         print(line)
     }
     print("Güç       \(s.onBattery ? "pil" : "adaptör")")
@@ -46,6 +49,8 @@ case nil, "durum":
 case "profil":
     guard argv.count >= 2 else { fail(usage) }
     printStatus(request(Request(cmd: "profile", profile: argv.dropFirst().joined(separator: " "))))
+case "otomatik":
+    printStatus(request(Request(cmd: "auto")))
 case "profiller":
     let s = request(Request(cmd: "status"))
     for p in s.config.profiles {
@@ -69,7 +74,7 @@ case "izle":
         Thread.sleep(forTimeInterval: 2)
     }
 case "json":
-    let s = request(Request(cmd: "status"))
+    let s = request(Request(cmd: "status", since: 0))
     let enc = JSONEncoder()
     enc.outputFormatting = [.prettyPrinted, .sortedKeys]
     print(String(decoding: try! enc.encode(s), as: UTF8.self))

@@ -1,127 +1,53 @@
-import Charts
 import PervaneCore
 import SwiftUI
 
+enum PanelTab: String, CaseIterable, Identifiable {
+    case status = "durum", profiles = "profiller", rules = "kurallar", settings = "ayarlar"
+
+    var id: String { rawValue }
+}
+
 struct PanelView: View {
     @ObservedObject var model: Model
+    @State private var tab: PanelTab
     @State private var editing: String?
+
+    init(model: Model, tab: PanelTab = .status, editing: String? = nil) {
+        self.model = model
+        _tab = State(initialValue: tab)
+        _editing = State(initialValue: editing)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let s = model.status {
-                header(s)
-                HistoryChart(samples: s.history)
-                Divider()
-                profiles(s)
-                if let name = editing, let profile = s.config.profile(named: name) {
-                    ProfileEditor(profile: profile, canDelete: s.config.profiles.count > 1) { changed in
-                        model.update { c in
-                            guard let i = c.profiles.firstIndex(where: { $0.name == name }) else { return }
-                            c.profiles[i] = changed
-                        }
-                    } onDelete: {
-                        editing = nil
-                        model.update { c in
-                            c.profiles.removeAll { $0.name == name }
-                            c.rules.removeAll { $0.profile == name }
-                        }
-                    }
+                Picker("", selection: $tab) {
+                    Text("Durum").tag(PanelTab.status)
+                    Text("Profiller").tag(PanelTab.profiles)
+                    Text("Kurallar").tag(PanelTab.rules)
+                    Image(systemName: "gearshape").tag(PanelTab.settings)
                 }
-                Divider()
-                RulesView(model: model, config: s.config)
-                Divider()
-                footer(s)
+                .pickerStyle(.segmented)
+                .labelsHidden()
+
+                switch tab {
+                case .status:
+                    StatusTab(model: model, s: s)
+                case .profiles:
+                    ProfilesTab(model: model, s: s, editing: $editing)
+                case .rules:
+                    RulesView(model: model, config: s.config)
+                case .settings:
+                    SettingsTab(model: model, s: s)
+                }
             } else {
                 notConnected
             }
         }
         .padding(14)
-        .frame(width: 340)
-    }
-
-    private func header(_ s: Status) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(s.temps.cpu.map { "\(Int($0.rounded())) °C" } ?? "–")
-                    .font(.system(size: 30, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(s.emergency ? .red : .primary)
-                Text("İşlemci").font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(s.fans.first.map { "\(Int($0.rpm.rounded()))" } ?? "–")
-                    .font(.system(size: 30, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                Text(s.wantedRPM.map { "dev/dk, hedef \(Int($0))" } ?? "dev/dk, sistem yönetiyor")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private func profiles(_ s: Status) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Profil").font(.headline)
-                Spacer()
-                if s.profile != s.config.activeProfile || s.emergency {
-                    Text("\(s.profile): \(s.reason)").font(.caption).foregroundStyle(.orange)
-                }
-            }
-            ForEach(s.config.profiles) { p in
-                HStack {
-                    Button {
-                        model.select(profile: p.name)
-                    } label: {
-                        HStack {
-                            Image(systemName: p.name == s.config.activeProfile ? "largecircle.fill.circle" : "circle")
-                                .foregroundStyle(p.name == s.config.activeProfile ? Color.accentColor : .secondary)
-                            Text(p.name)
-                            if p.name == s.profile, p.name != s.config.activeProfile {
-                                Image(systemName: "bolt.fill").foregroundStyle(.orange).font(.caption)
-                            }
-                            Spacer()
-                            Text(p.mode.label).font(.caption).foregroundStyle(.secondary)
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    Button {
-                        editing = editing == p.name ? nil : p.name
-                    } label: {
-                        Image(systemName: editing == p.name ? "chevron.up" : "slider.horizontal.3")
-                    }
-                    .buttonStyle(.borderless)
-                }
-            }
-            Button("Yeni Profil") {
-                var name = "Profil \(s.config.profiles.count + 1)"
-                while s.config.profile(named: name) != nil { name += "+" }
-                let base = s.config.profile(named: "Dengeli")?.curve ?? [.init(45, 0), .init(90, 100)]
-                model.update { $0.profiles.append(Profile(name: name, mode: .curve, curve: base)) }
-                editing = name
-            }
-            .buttonStyle(.link)
-        }
-    }
-
-    private func footer(_ s: Status) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Stepper(value: Binding(get: { s.config.emergencyTemp },
-                                   set: { v in model.update { $0.emergencyTemp = v } }),
-                    in: 80...105, step: 1) {
-                Text("Acil durum eşiği: \(Int(s.config.emergencyTemp)) °C")
-            }
-            HStack {
-                Text("Yonga \(s.temps.soc.map { "\(Int($0))°" } ?? "–")  Pil \(s.temps.battery.map { "\(Int($0))°" } ?? "–")  \(s.onBattery ? "pilde" : "adaptörde")")
-                    .font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Button("Çık") { NSApplication.shared.terminate(nil) }
-            }
-            if s.dryRun {
-                Text("Kuru çalışma: fana yazılmıyor").font(.caption).foregroundStyle(.orange)
-            }
-        }
+        .frame(width: 360)
+        .onAppear { model.panelOpened() }
+        .onDisappear { model.panelClosed() }
     }
 
     private var notConnected: some View {
@@ -139,27 +65,135 @@ struct PanelView: View {
     }
 }
 
-struct HistoryChart: View {
-    let samples: [Sample]
+// MARK: Durum
+
+struct StatusTab: View {
+    @ObservedObject var model: Model
+    let s: Status
 
     var body: some View {
-        let now = Date().timeIntervalSince1970
-        // 30 dakikalık geçmişi ~150 noktaya indir.
-        let stride = max(1, samples.count / 150)
-        let points = samples.enumerated().filter { $0.offset % stride == 0 }.map(\.element)
-        Chart(points, id: \.t) { s in
-            LineMark(x: .value("dk", (s.t - now) / 60), y: .value("°C", s.temp))
-                .foregroundStyle(.orange)
-                .interpolationMethod(.monotone)
+        VStack(alignment: .leading, spacing: 12) {
+            gauges
+            chips
+            banner
+            HistoryChart(samples: model.history, fan: s.fans.first, emergency: s.config.emergencyTemp)
+                .card()
+            profilePicker
         }
-        .chartXScale(domain: -30...0)
-        .chartYScale(domain: 30...105)
-        .chartXAxis {
-            AxisMarks(values: [-30, -20, -10, 0]) { v in
-                AxisGridLine()
-                AxisValueLabel { Text(v.as(Int.self) == 0 ? "şimdi" : "\(v.as(Int.self) ?? 0) dk") }
+    }
+
+    private var gauges: some View {
+        let temp = s.temps.cpu
+        let limit = s.config.emergencyTemp
+        let percent = s.fans.isEmpty ? 0 : s.fans.map(fanPercent).reduce(0, +) / Double(s.fans.count)
+        return HStack(alignment: .top, spacing: 0) {
+            VStack(spacing: 4) {
+                RingGauge(value: ((temp ?? 30) - 30) / max(1, limit - 30),
+                          colors: [heatColor(45, limit: limit), heatColor(70, limit: limit), heatColor(limit, limit: limit)]) {
+                    VStack(spacing: 0) {
+                        Text(temp.map { "\(Int($0.rounded()))°" } ?? "–")
+                            .font(.system(size: 32, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                            .foregroundStyle(s.emergency ? Color.red : Color.primary)
+                        Text("İşlemci").font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+                Text(s.emergency ? "acil durum" : "eşik \(Int(limit))°")
+                    .font(.caption).foregroundStyle(s.emergency ? Color.red : Color.secondary)
+            }
+            .frame(maxWidth: .infinity)
+
+            VStack(spacing: 4) {
+                RingGauge(value: percent / 100, colors: [fanTint.opacity(0.55), fanTint]) {
+                    VStack(spacing: 0) {
+                        Text("%\(Int(percent.rounded()))")
+                            .font(.system(size: 32, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                        Text(s.fans.count > 1 ? "\(s.fans.count) fan" : "Fan").font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+                Text(s.fans.map { grouped($0.rpm) }.joined(separator: " · ") + " dev/dk")
+                    .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .animation(.default, value: temp.map { Int($0.rounded()) })
+    }
+
+    private var chips: some View {
+        HStack(spacing: 6) {
+            Chip(symbol: "cpu", text: "Yonga \(s.temps.soc.map { "\(Int($0.rounded()))°" } ?? "–")")
+            Chip(symbol: "battery.75percent", text: "Pil \(s.temps.battery.map { "\(Int($0.rounded()))°" } ?? "–")")
+            Chip(symbol: s.onBattery ? "bolt.slash.fill" : "powerplug.fill", text: s.onBattery ? "Pilde" : "Adaptörde",
+                 tint: s.onBattery ? .orange : .green)
+            Spacer(minLength: 0)
+        }
+    }
+
+    /// Fanı kimin, neden yönettiğini tek satırda söyler.
+    @ViewBuilder private var banner: some View {
+        if s.emergency {
+            notice("exclamationmark.triangle.fill", .red, "Acil durum: fan tam güçte", nil, nil)
+        } else if s.dryRun {
+            notice("eye.slash", .orange, "Kuru çalışma: fana yazılmıyor", nil, nil)
+        } else if s.profile != s.config.activeProfile {
+            notice("bolt.fill", .orange, "\(s.reason.prefix(1).uppercased() + s.reason.dropFirst()): \(s.profile)",
+                   "Seçilene dön") { model.select(profile: s.config.activeProfile) }
+        } else if let pending = s.pendingRule {
+            notice("hand.point.up.left.fill", .secondary, "Elle seçtin. Bekleyen kural: \(pending)",
+                   "Kurala dön") { model.resumeRules() }
+        } else if s.cool == true {
+            notice("snowflake", fanTint, "Soğuk: fan sisteme bırakıldı", nil, nil)
+        } else if s.wantedRPM == nil {
+            notice("apple.logo", .secondary, "Fanı sistem yönetiyor", nil, nil)
+        } else if let wanted = s.wantedRPM {
+            notice("target", .secondary, "Hedef \(grouped(wanted)) dev/dk", nil, nil)
+        }
+    }
+
+    private func notice(_ symbol: String, _ tint: Color, _ text: String, _ action: String?,
+                        _ run: (() -> Void)?) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: symbol).foregroundStyle(tint)
+            Text(text).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 4)
+            if let action, let run {
+                Button(action, action: run).buttonStyle(.link)
             }
         }
-        .frame(height: 90)
+        .font(.callout)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var profilePicker: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(s.config.profiles) { p in
+                    let running = p.name == s.profile
+                    let chosen = p.name == s.config.activeProfile
+                    Button {
+                        model.select(profile: p.name)
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: symbol(for: p)).font(.system(size: 15)).frame(height: 18)
+                            Text(p.name).font(.caption2).lineLimit(1)
+                        }
+                        .frame(width: 60, height: 48)
+                        .foregroundStyle(running ? Color.white : Color.primary)
+                        .background(running ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary.opacity(0.45)),
+                                    in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .strokeBorder(Color.accentColor, lineWidth: chosen && !running ? 1.5 : 0))
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(summary(of: p))
+                }
+            }
+        }
     }
 }

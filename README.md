@@ -17,27 +17,29 @@
 </p>
 
 <p align="center">
-  <img src="docs/panel.png" alt="Pervane menu bar panel: CPU temperature, fan speed, 30-minute history and profiles" width="340">
+  <img src="docs/panel.png" alt="Pervane menu bar panel: temperature and fan gauges, 30-minute temperature and fan chart, profile picker" width="340">
   &nbsp;&nbsp;
-  <img src="docs/egri-duzenleyici.png" alt="Pervane curve editor in dark mode: draggable temperature-to-fan-speed points" width="340">
+  <img src="docs/egri-duzenleyici.png" alt="Pervane profiles and curve editor in dark mode: draggable points with the live temperature on the curve" width="340">
 </p>
 
-<p align="center"><sub>Live captures from a MacBook Pro M1. The interface is in Turkish for now (<i>pervane</i> means "propeller"); see the <a href="#glossary">glossary</a>.</sub></p>
+<p align="center"><sub>Live captures from a MacBook Pro M5 Pro. The interface is in Turkish for now (<i>pervane</i> means "propeller"); see the <a href="#glossary">glossary</a>.</sub></p>
 
 ---
 
 ## Why Pervane?
 
-macOS spins the fan up late: the Mac heats up first, then cools down. Pervane drives the fan along a curve you draw, switches to a cooler profile on its own when Docker starts, and goes quiet on battery. It's all under 1,700 lines of Swift with no external dependencies.
+macOS spins the fan up late: the Mac heats up first, then cools down. Pervane drives the fan along a curve you draw, switches to a cooler profile on its own when Docker starts, and goes quiet on battery. It's all under 2,600 lines of Swift with no external dependencies, and it uses less than 0.5 % of a CPU core while it sits in the menu bar.
 
 | | |
 |---|---|
-| 📈 **Draggable fan curve** | Move points with the mouse: temperature → fan speed. Up to 12 points per profile. |
+| 📈 **Draggable fan curve** | Move points with the mouse, double-click to add or remove one; the live temperature shows on the curve. Up to 12 points per profile. |
 | 🎚️ **Four modes** | System, Fixed, Curve, Full power. |
-| 🔀 **Auto-switching** | "While this app is running" and "on battery" rules; the first match wins. |
+| 🔀 **Auto-switching** | "While this app is running" and "on battery" rules; the first match wins. Pick the app from the list of running ones. |
+| 🍃 **Hands off when cool** | When the curve says 0 %, the fan isn't held at minimum RPM; it's handed back to macOS (can be turned off in settings). |
 | 🚨 **Emergency brake** | Above a threshold the fan goes to full power whatever the profile, and stays there until things cool down by 8 °C. |
 | 🧈 **Smooth ramps** | At most 600 RPM change per tick; a hysteresis band keeps the fan from hunting up and down. |
-| 📊 **30-minute history** | Temperature chart right in the menu bar panel. |
+| 📊 **30-minute history** | Temperature line and fan percentage in one chart; hover for the values at that moment. |
+| 🪶 **Quiet menu bar** | Icon, temperature, percentage or RPM: you choose what to show. Starts at login. |
 | ⌨️ **Command line** | `pervane`, `pervane izle` (watch), `pervane json` for scripts. |
 | 🛟 **Safe shutdown** | Whether the service stops or crashes, the fan is handed back to macOS. |
 
@@ -103,7 +105,8 @@ That reads: profile *Balanced* (selected), CPU 64 °C, SoC 53 °C, battery 32 °
 | Command | What it does |
 |---|---|
 | `pervane` | Status: profile, temperatures, fan speed |
-| `pervane profil <name>` | Select a profile |
+| `pervane profil <name>` | Select a profile (overrides rules) |
+| `pervane otomatik` | Drop the manual choice and go back to the rules |
 | `pervane profiller` | List profiles and rules |
 | `pervane izle` | Refresh the status every 2 seconds |
 | `pervane json` | Raw status for scripts |
@@ -121,7 +124,9 @@ Percentages are positions between the fan's minimum and maximum speed: 0 % is th
 | **Serin** (Cool) | Curve | 40° → 15 % · 55° → 45 % · 70° → 80 % · 80° → 100 % | 3 °C |
 | **Tam güç** (Full power) | Full power | Always 100 % | – |
 
-To add your own profile, click "Yeni Profil" (New Profile) in the panel. There you also pick which sensor drives the curve: CPU, SoC, battery or the hottest of them.
+To add your own profile, click "Yeni Profil" (New Profile) in the panel's Profiller tab. There you also set its name, icon and which sensor drives the curve: CPU, SoC, battery or the hottest of them.
+
+In curve mode, when the percentage drops to 0 % the fan is handed back to macOS; Pervane takes over again once the temperature re-enters the curve. To always drive the fan yourself, turn off "Soğukken fanı sisteme bırak" in settings.
 
 ## How it works
 
@@ -141,7 +146,7 @@ flowchart LR
 
 Each tick (2 seconds):
 
-1. **Read.** Performance and efficiency core, SoC and battery temperatures come from the SMC.
+1. **Read.** Performance and efficiency core, SoC and battery temperatures come from the SMC. Key metadata is cached, and an unchanged target isn't written to the fan again.
 2. **Smooth.** An exponential average absorbs one-off spikes; rises are followed quickly, drops slowly.
 3. **Pick a profile.** Rules are tried in order; if none matches, the selected profile applies.
 4. **Decide.** The curve gives a percentage; speed only drops once the temperature has fallen by the hysteresis band.
@@ -207,7 +212,7 @@ swift run pervane sensor
 
 | Path | Contents |
 |---|---|
-| `/Library/Application Support/Pervane/ayar.json` | Profiles, rules, emergency threshold |
+| `/Library/Application Support/Pervane/ayar.json` | Profiles, rules, emergency threshold, hands-off-when-cool |
 | `/var/run/pervane.sock` | Service socket (override with `PERVANE_SOCKET`) |
 | `/var/log/pervaned.log` | Service log: profile changes, errors |
 | `/Library/LaunchDaemons/com.tunca.pervaned.plist` | launchd definition |
@@ -222,7 +227,10 @@ The interface and CLI are in Turkish for now. Pull requests for localization are
 | dev/dk · hedef | RPM · target |
 | Profil · Kip · Eğri · Sabit · Tam güç | Profile · Mode · Curve · Fixed · Full power |
 | Sessiz · Dengeli · Serin | Quiet · Balanced · Cool |
-| Otomatik Geçiş · Pil Kuralı Ekle | Auto-switch · Add battery rule |
+| Durum · Profiller · Kurallar | Status · Profiles · Rules |
+| Seçilene dön · Kurala dön | Back to selected profile · Back to the rule |
+| Soğukken fanı sisteme bırak | Hand the fan to macOS when cool |
+| Uygulama Ekle · Pil Kuralı · otomatik | Add app · Battery rule · automatic (follow rules) |
 | Acil durum eşiği · Bant | Emergency threshold · Hysteresis band |
 | kur · kaldır · izle | install · uninstall · watch |
 

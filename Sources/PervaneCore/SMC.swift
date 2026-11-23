@@ -16,12 +16,24 @@ public final class SMC {
         public let bytes: [UInt8]
     }
 
+    /// Anahtarın boyutu ve tipi sabittir; bir kez sorulur.
+    private var infoCache: [String: (size: UInt32, type: String)] = [:]
+
+    private func info(_ key: String) -> (size: UInt32, type: String)? {
+        if let hit = infoCache[key] { return hit }
+        var size: UInt32 = 0
+        var type = [CChar](repeating: 0, count: 5)
+        guard smc_key_info(conn, key, &size, &type) == KERN_SUCCESS, size <= 32 else { return nil }
+        let entry = (size: size, type: String(cString: type))
+        infoCache[key] = entry
+        return entry
+    }
+
     public func read(_ key: String) -> Value? {
-        var v = smc_val_t()
-        guard smc_read(conn, key, &v) == KERN_SUCCESS else { return nil }
-        let type = withUnsafeBytes(of: v.type) { String(decoding: $0.prefix(4), as: UTF8.self) }
-        let bytes = withUnsafeBytes(of: v.bytes) { Array($0.prefix(Int(v.size))) }
-        return Value(type: type, bytes: bytes)
+        guard let i = info(key) else { return nil }
+        var bytes = [UInt8](repeating: 0, count: 32)
+        guard smc_read_raw(conn, key, i.size, &bytes) == KERN_SUCCESS else { return nil }
+        return Value(type: i.type, bytes: Array(bytes.prefix(Int(i.size))))
     }
 
     public func number(_ key: String) -> Double? {
@@ -46,7 +58,7 @@ public final class SMC {
     /// Anahtarın kendi tipine göre kodlayıp yazar.
     @discardableResult
     public func write(_ key: String, _ value: Double) -> Bool {
-        guard let current = read(key) else { return false }
+        guard let current = info(key) else { return false }
         var bytes: [UInt8]
         switch current.type {
         case "flt ":
@@ -62,7 +74,8 @@ public final class SMC {
         default:
             return false
         }
-        return smc_write(conn, key, &bytes, UInt32(bytes.count)) == KERN_SUCCESS
+        guard bytes.count == Int(current.size) else { return false }
+        return smc_write_raw(conn, key, &bytes, UInt32(bytes.count)) == KERN_SUCCESS
     }
 
     public func allKeys() -> [String] {

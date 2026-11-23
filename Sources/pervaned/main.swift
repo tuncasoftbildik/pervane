@@ -1,5 +1,6 @@
 import Foundation
 import PervaneCore
+import notify
 
 // Pervane servisi: fanı süren tek yer. Root olarak launchd altında çalışır.
 //   --uid <n>     soket bu kullanıcıya verilir (yalnız o bağlanabilir)
@@ -55,12 +56,19 @@ var controller = Controller(config: loadConfig())
 var history: [Sample] = []
 var smoothed: Temps?
 var processes: [String] = []
+/// Süreç listesinin yaşı (tur); kural değişince hemen yenilensin diye büyük başlar.
+var processAge = Int.max
 var tickCount = 0
 var lastDecision = Decision(percent: nil, profile: controller.config.activeProfile, reason: "başlıyor", emergency: false)
 var wantedRPM: Double?
 /// Son yazdığımız devir; yumuşak geçişin başlangıcı.
 var appliedRPM: Double?
 var releasing = false
+/// Son turda okunan değerler; durum isteği sensörleri yeniden okumaz, bunları verir.
+var lastFans: [FanState] = []
+var lastTemps = Temps(cpuP: nil, cpuE: nil, soc: nil, battery: nil)
+/// Güç kaynağı değişince sistem haber verir; her turda sorulmaz.
+var onBattery = isOnBattery()
 
 /// Tek tük sıçramaları yutmak için üstel ortalama; yükselişi hızlı, düşüşü yavaş izler.
 func smooth(_ new: Double?, _ old: Double?) -> Double? {
@@ -77,9 +85,22 @@ func release() {
 func tick() {
     guard !releasing else { return }
     let raw = hw.temps()
+    lastTemps = raw
     smoothed = Temps(cpuP: smooth(raw.cpuP, smoothed?.cpuP), cpuE: smooth(raw.cpuE, smoothed?.cpuE),
                      soc: smooth(raw.soc, smoothed?.soc), battery: smooth(raw.battery, smoothed?.battery))
-    if tickCount % 5 == 0 { processes = runningProcessNames() }
+    // Süreç listesi yalnız açık bir uygulama kuralı varsa ve 10 saniyede bir taranır.
+    if controller.config.rules.contains(where: { $0.enabled && $0.kind == .app }) {
+        if processAge >= 5 {
+            processes = runningProcessNames()
+            processAge = 0
+        }
+        processAge += 1
+    } else if !processes.isEmpty {
+        processes = []
+        processAge = Int.max
+    }
+    // Bildirim kaçarsa diye dakikada bir yine de sor.
+    if tickCount % 30 == 0 { onBattery = isOnBattery() }
     tickCount += 1
 
     // Acil durum ham değere bakar; ortalama gecikmesin.
@@ -87,13 +108,14 @@ func tick() {
     if let hot = raw.value(for: .hottest), hot >= controller.config.emergencyTemp {
         forDecision = raw
     }
-    let decision = controller.decide(temps: forDecision, onBattery: isOnBattery(), processes: processes)
+    let decision = controller.decide(temps: forDecision, onBattery: onBattery, processes: processes)
     if decision.profile != lastDecision.profile || decision.emergency != lastDecision.emergency {
         log("profil: \(decision.profile) (\(decision.reason))")
     }
     lastDecision = decision
 
     let fans = hw.fans()
+    lastFans = fans
     if let percent = decision.percent, let first = fans.first {
         let target = first.min + (first.max - first.min) * percent / 100
         // Acil durumda bekleme yok; yoksa tur başına en çok 600 devir.
@@ -104,7 +126,8 @@ func tick() {
         if !dryRun {
             for (i, fan) in fans.enumerated() {
                 let rpm = fan.min + (fan.max - fan.min) * (next - first.min) / max(1, first.max - first.min)
-                if !hw.setTarget(fan: i, rpm: rpm.rounded()) { log("fan \(i) yazılamadı") }
+                // Hedef değişmediyse ve fan hâlâ elle moddaysa SMC'ye yazılmaz.
+                if !hw.apply(fan: i, rpm: rpm.rounded(), current: fan) { log("fan \(i) yazılamadı") }
             }
         }
     } else {
@@ -114,37 +137,62 @@ func tick() {
     }
 
     if let t = raw.value(for: .hottest), let rpm = fans.first?.rpm {
-        history.append(Sample(t: Date().timeIntervalSince1970, temp: t, rpm: rpm))
+        // Yuvarlanmış değerler: geçmiş ağda ve bellekte az yer tutsun.
+        history.append(Sample(t: Date().timeIntervalSince1970.rounded(), temp: (t * 10).rounded() / 10, rpm: rpm.rounded()))
         if history.count > historyLimit { history.removeFirst(history.count - historyLimit) }
     }
 }
 
-func status(error: String? = nil, withHistory: Bool = true) -> Status {
-    Status(ok: error == nil, error: error, fans: hw.fans(), temps: hw.temps(), onBattery: isOnBattery(),
-           profile: lastDecision.profile, reason: lastDecision.reason, emergency: lastDecision.emergency,
-           wantedRPM: wantedRPM, dryRun: dryRun, config: controller.config, history: withHistory ? history : [])
+/// `since` nil ise geçmiş gönderilmez; 0 ise tamamı, yoksa yalnız o andan yeni örnekler.
+func status(error: String? = nil, since: Double? = nil) -> Status {
+    var pending: String?
+    if controller.manualOverride, let m = controller.ruleMatch(onBattery: onBattery, processes: processes),
+       m.profile != controller.config.activeProfile {
+        pending = "\(m.reason) → \(m.profile)"
+    }
+    let samples: [Sample]
+    if let since {
+        // Örnekler zamana göre sıralı; sondan geriye yürümek yeter.
+        let firstNew = history.lastIndex(where: { $0.t <= since }).map { $0 + 1 } ?? 0
+        samples = Array(history[firstNew...])
+    } else {
+        samples = []
+    }
+    return Status(ok: error == nil, error: error, fans: lastFans, temps: lastTemps, onBattery: onBattery,
+                  profile: lastDecision.profile, reason: lastDecision.reason, emergency: lastDecision.emergency,
+                  wantedRPM: wantedRPM, dryRun: dryRun, config: controller.config, history: samples,
+                  cool: lastDecision.cool, manualOverride: controller.manualOverride, pendingRule: pending)
 }
 
 func handle(_ req: Request) -> Status {
     switch req.cmd {
     case "status":
-        return status()
+        return status(since: req.since)
     case "profile":
         guard let name = req.profile, controller.config.profile(named: name) != nil else {
-            return status(error: "Böyle bir profil yok", withHistory: false)
+            return status(error: "Böyle bir profil yok")
         }
         controller.selectManually(name)
         saveConfig(controller.config)
         tick()
-        return status()
-    case "config":
-        guard let c = req.config else { return status(error: "Ayar eksik", withHistory: false) }
-        controller.config = c.sanitized()
-        saveConfig(controller.config)
+        return status(since: req.since)
+    case "auto":
+        // Elle seçimi bırak; tutan kural varsa yeniden o geçerli olur.
+        controller.clearManual()
         tick()
-        return status()
+        return status(since: req.since)
+    case "config":
+        guard let c = req.config else { return status(error: "Ayar eksik") }
+        let clean = c.sanitized()
+        if clean != controller.config {
+            controller.config = clean
+            saveConfig(clean)
+            processAge = Int.max
+            tick()
+        }
+        return status(since: req.since)
     default:
-        return status(error: "Bilinmeyen komut", withHistory: false)
+        return status(error: "Bilinmeyen komut")
     }
 }
 
@@ -179,7 +227,7 @@ acceptSource.setEventHandler {
     if let line = readLine(fd, limit: 256 << 10), let req = try? JSONDecoder().decode(Request.self, from: line) {
         reply = handle(req)
     } else {
-        reply = status(error: "İstek okunamadı", withHistory: false)
+        reply = status(error: "İstek okunamadı")
     }
     if var out = try? JSONEncoder().encode(reply) {
         out.append(0x0a)
@@ -205,8 +253,18 @@ for sig in [SIGTERM, SIGINT, SIGHUP] {
     signalSources.append(src)
 }
 
+// Fiş takılıp çekilince hemen karar ver; bir sonraki turu bekleme.
+var powerToken: Int32 = 0
+notify_register_dispatch("com.apple.system.powersources.source", &powerToken, DispatchQueue.main) { _ in
+    let now = isOnBattery()
+    guard now != onBattery else { return }
+    onBattery = now
+    tick()
+}
+
 let timer = DispatchSource.makeTimerSource(queue: .main)
-timer.schedule(deadline: .now(), repeating: tickSeconds, leeway: .milliseconds(200))
+// Geniş pay: sistem uyanışları başka zamanlayıcılarla birleştirebilsin.
+timer.schedule(deadline: .now(), repeating: tickSeconds, leeway: .milliseconds(500))
 timer.setEventHandler { tick() }
 timer.resume()
 

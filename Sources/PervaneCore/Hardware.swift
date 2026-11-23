@@ -68,6 +68,9 @@ public final class Hardware {
     private let hasFtst: Bool
     /// Fan kip anahtarı: M1'de "F0Md", M5 Pro / macOS 27'de "F0md".
     private let modeKeyLower: Bool
+    /// Fan başına anahtar adları ve devir aralığı; aralık sabittir, bir kez okunur.
+    private struct FanKeys { let actual, target, mode: String; let min, max: Double }
+    private var fanKeys: [FanKeys?] = []
 
     public init?() {
         guard let smc = SMC() else { return nil }
@@ -89,6 +92,10 @@ public final class Hardware {
         eKeys = e
         socKeys = pick("^Ts[0-9a-f]a$")
         batteryKeys = pick("^TB[0-9]T$")
+        fanKeys = (0..<fanCount).map { i in
+            guard let lo = smc.number("F\(i)Mn"), let hi = smc.number("F\(i)Mx") else { return nil }
+            return FanKeys(actual: "F\(i)Ac", target: "F\(i)Tg", mode: modeKey(i), min: lo, max: hi)
+        }
     }
 
     private func modeKey(_ i: Int) -> String { modeKeyLower ? "F\(i)md" : "F\(i)Md" }
@@ -102,21 +109,21 @@ public final class Hardware {
     }
 
     public func fans() -> [FanState] {
-        (0..<fanCount).compactMap { i in
-            guard let rpm = smc.number("F\(i)Ac"),
-                  let lo = smc.number("F\(i)Mn"),
-                  let hi = smc.number("F\(i)Mx") else { return nil }
-            return FanState(rpm: rpm, min: lo, max: hi,
-                            target: smc.number("F\(i)Tg") ?? 0,
-                            manual: (smc.number(modeKey(i)) ?? 0) != 0)
+        fanKeys.compactMap { k in
+            guard let k, let rpm = smc.number(k.actual) else { return nil }
+            return FanState(rpm: rpm, min: k.min, max: k.max,
+                            target: smc.number(k.target) ?? 0,
+                            manual: (smc.number(k.mode) ?? 0) != 0)
         }
     }
 
-    /// Fanı elle moda alıp hedef devri yazar.
+    /// Fanı elle moda alıp hedef devri yazar. `current` bu turda okunan durumdur:
+    /// fan zaten elle modda ve hedef aynıysa SMC'ye hiç yazılmaz.
     @discardableResult
-    public func setTarget(fan i: Int, rpm: Double) -> Bool {
+    public func apply(fan i: Int, rpm: Double, current: FanState) -> Bool {
         if hasFtst, smc.number("Ftst") != 1 { smc.write("Ftst", 1) }
-        if smc.number(modeKey(i)) != 1, !smc.write(modeKey(i), 1) { return false }
+        if !current.manual, !smc.write(modeKey(i), 1) { return false }
+        if current.manual, abs(current.target - rpm) < 1 { return true }
         return smc.write("F\(i)Tg", rpm)
     }
 

@@ -6,6 +6,12 @@ cd "${0:A:h}"
 
 APP="$HOME/Applications/Pervane.app"
 
+# Menü çubuğu uygulaması SwiftUI makroları yüzünden tam Xcode ister; yalnız komut satırı araçları
+# seçiliyse ve Xcode kuruluysa onu kullan.
+if [[ -z "${DEVELOPER_DIR:-}" && "$(xcode-select -p 2>/dev/null)" == */CommandLineTools && -d /Applications/Xcode.app ]]; then
+  export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+fi
+
 echo "Derleniyor…"
 swift build -c release 2>&1 | tail -1
 BIN=$(swift build -c release --show-bin-path)

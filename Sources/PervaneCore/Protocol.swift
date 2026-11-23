@@ -22,15 +22,18 @@ public struct Request: Codable {
     public var cmd: String
     public var profile: String?
     public var config: Config?
+    /// Bu andan (epoch saniyesi) yeni geçmiş örnekleri istenir; nil = geçmiş gönderilmez, 0 = hepsi.
+    public var since: Double?
 
-    public init(cmd: String, profile: String? = nil, config: Config? = nil) {
+    public init(cmd: String, profile: String? = nil, config: Config? = nil, since: Double? = nil) {
         self.cmd = cmd
         self.profile = profile
         self.config = config
+        self.since = since
     }
 }
 
-public struct Status: Codable {
+public struct Status: Codable, Equatable {
     public var ok: Bool
     public var error: String?
     public var fans: [FanState]
@@ -44,9 +47,19 @@ public struct Status: Codable {
     public var dryRun: Bool
     public var config: Config
     public var history: [Sample]
+    /// Eğri %0 verdiği için fan sisteme bırakıldı.
+    public var cool: Bool?
+    /// Profil menüden elle seçildi ve kuralların önünde.
+    public var manualOverride: Bool?
+    /// Elle seçim yüzünden bekleyen kural ("pilde → Sessiz"); yoksa nil.
+    public var pendingRule: String?
 
     public init(ok: Bool, error: String? = nil, fans: [FanState], temps: Temps, onBattery: Bool, profile: String,
-                reason: String, emergency: Bool, wantedRPM: Double?, dryRun: Bool, config: Config, history: [Sample]) {
+                reason: String, emergency: Bool, wantedRPM: Double?, dryRun: Bool, config: Config, history: [Sample],
+                cool: Bool? = nil, manualOverride: Bool? = nil, pendingRule: String? = nil) {
+        self.cool = cool
+        self.manualOverride = manualOverride
+        self.pendingRule = pendingRule
         self.ok = ok
         self.error = error
         self.fans = fans

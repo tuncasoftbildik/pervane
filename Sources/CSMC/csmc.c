@@ -119,3 +119,38 @@ kern_return_t smc_key_at(io_connect_t conn, uint32_t index, char key[5]) {
     unfourcc(out.key, key);
     return KERN_SUCCESS;
 }
+
+// Anahtar bilgisi (boyut, tip) hiç değişmez; çağıran saklar, okuma/yazma tek çekirdek çağrısına iner.
+kern_return_t smc_key_info(io_connect_t conn, const char *key, uint32_t *size, char type[5]) {
+    if (strlen(key) != 4) return kIOReturnBadArgument;
+    smc_keyinfo_t info;
+    kern_return_t kr = smc_keyinfo(conn, fourcc(key), &info);
+    if (kr != KERN_SUCCESS) return kr;
+    *size = info.dataSize;
+    unfourcc(info.dataType, type);
+    return KERN_SUCCESS;
+}
+
+kern_return_t smc_read_raw(io_connect_t conn, const char *key, uint32_t size, uint8_t out_bytes[32]) {
+    if (strlen(key) != 4 || size > 32) return kIOReturnBadArgument;
+    smc_param_t in, out;
+    memset(&in, 0, sizeof in); memset(&out, 0, sizeof out);
+    in.key = fourcc(key);
+    in.keyInfo.dataSize = size;
+    in.data8 = SMC_CMD_READ_BYTES;
+    kern_return_t kr = smc_call(conn, &in, &out);
+    if (kr != KERN_SUCCESS) return kr;
+    memcpy(out_bytes, out.bytes, size);
+    return KERN_SUCCESS;
+}
+
+kern_return_t smc_write_raw(io_connect_t conn, const char *key, const uint8_t *bytes, uint32_t size) {
+    if (strlen(key) != 4 || size > 32) return kIOReturnBadArgument;
+    smc_param_t in, out;
+    memset(&in, 0, sizeof in); memset(&out, 0, sizeof out);
+    in.key = fourcc(key);
+    in.keyInfo.dataSize = size;
+    in.data8 = SMC_CMD_WRITE_BYTES;
+    memcpy(in.bytes, bytes, size);
+    return smc_call(conn, &in, &out);
+}

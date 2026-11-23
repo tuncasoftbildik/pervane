@@ -19,5 +19,8 @@ kern_return_t smc_read(io_connect_t conn, const char *key, smc_val_t *out);
 kern_return_t smc_write(io_connect_t conn, const char *key, const uint8_t *bytes, uint32_t size);
 kern_return_t smc_key_count(io_connect_t conn, uint32_t *count);
 kern_return_t smc_key_at(io_connect_t conn, uint32_t index, char key[5]);
+kern_return_t smc_key_info(io_connect_t conn, const char *key, uint32_t *size, char type[5]);
+kern_return_t smc_read_raw(io_connect_t conn, const char *key, uint32_t size, uint8_t out_bytes[32]);
+kern_return_t smc_write_raw(io_connect_t conn, const char *key, const uint8_t *bytes, uint32_t size);
 
 #endif

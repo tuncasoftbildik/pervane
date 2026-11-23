@@ -9,7 +9,10 @@ public func isOnBattery() -> Bool {
 
 /// Çalışan süreçlerin adları (tekrarsız).
 public func runningProcessNames() -> [String] {
-    var pids = [pid_t](repeating: 0, count: 4096)
+    // Önce sayıyı sor; sabit boyutlu tampon kalabalık sistemde listeyi keserdi.
+    let count = Int(proc_listallpids(nil, 0))
+    guard count > 0 else { return [] }
+    var pids = [pid_t](repeating: 0, count: count + 64)
     let n = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size))
     guard n > 0 else { return [] }
     var names = Set<String>()

@@ -32,11 +32,14 @@ public struct Profile: Codable, Equatable, Identifiable {
     public var curve: [CurvePoint]
     /// Sıcaklık bu kadar düşmeden devir indirilmez.
     public var hysteresis: Double
+    /// Arayüzde gösterilen SF Symbols adı; nil ise ada ve kipe göre seçilir.
+    public var icon: String?
 
     public var id: String { name }
 
     public init(name: String, mode: FanMode, fixedPercent: Double = 40, sensor: SensorKind = .cpu,
-                curve: [CurvePoint] = [], hysteresis: Double = 4) {
+                curve: [CurvePoint] = [], hysteresis: Double = 4, icon: String? = nil) {
+        self.icon = icon
         self.name = name
         self.mode = mode
         self.fixedPercent = fixedPercent
@@ -85,12 +88,27 @@ public struct Config: Codable, Equatable {
     public var rules: [Rule]
     /// Bu sıcaklıkta profil ne olursa olsun fan tam güce çıkar.
     public var emergencyTemp: Double
+    /// Eğri %0 verdiğinde fan en düşük devirde tutulmaz, sisteme bırakılır
+    /// (sistem soğukken fanı daha da yavaşlatabilir ya da durdurabilir).
+    public var releaseWhenCool: Bool
 
-    public init(activeProfile: String, profiles: [Profile], rules: [Rule], emergencyTemp: Double) {
+    public init(activeProfile: String, profiles: [Profile], rules: [Rule], emergencyTemp: Double,
+                releaseWhenCool: Bool = true) {
         self.activeProfile = activeProfile
         self.profiles = profiles
         self.rules = rules
         self.emergencyTemp = emergencyTemp
+        self.releaseWhenCool = releaseWhenCool
+    }
+
+    /// Eski ayar dosyalarında olmayan alanlar varsayılanla dolar; dosya çöpe gitmez.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        activeProfile = try c.decode(String.self, forKey: .activeProfile)
+        profiles = try c.decode([Profile].self, forKey: .profiles)
+        rules = try c.decode([Rule].self, forKey: .rules)
+        emergencyTemp = try c.decode(Double.self, forKey: .emergencyTemp)
+        releaseWhenCool = try c.decodeIfPresent(Bool.self, forKey: .releaseWhenCool) ?? true
     }
 
     public static let `default` = Config(
@@ -116,9 +134,15 @@ public struct Config: Codable, Equatable {
     /// Root servise dışarıdan gelen ayarı güvenli sınırlara çeker.
     public func sanitized() -> Config {
         var c = self
+        var seen = Set<String>()
         c.profiles = Array(c.profiles.prefix(32)).map { p in
             var p = p
-            p.name = String(p.name.prefix(40))
+            p.name = String(p.name.trimmingCharacters(in: .whitespaces).prefix(40))
+            p.icon = p.icon.flatMap { icon in
+                let ok = icon.count <= 40 && !icon.isEmpty
+                    && icon.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == ".") }
+                return ok ? icon : nil
+            }
             p.fixedPercent = p.fixedPercent.clamped(0, 100)
             p.hysteresis = p.hysteresis.clamped(0, 15)
             p.curve = Array(p.curve.prefix(12))
@@ -126,7 +150,7 @@ public struct Config: Codable, Equatable {
                 .sorted { $0.temp < $1.temp }
             if p.mode == .curve, p.curve.isEmpty { p.mode = .auto }
             return p
-        }.filter { !$0.name.isEmpty }
+        }.filter { !$0.name.isEmpty && seen.insert($0.name).inserted }
         if c.profiles.isEmpty { c.profiles = Config.default.profiles }
         let names = Set(c.profiles.map(\.name))
         if !names.contains(c.activeProfile) { c.activeProfile = c.profiles[0].name }
