@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/panel.png" alt="Pervane menu bar panel: temperature and fan gauges, 30-minute temperature and fan chart, profile picker" width="340">
+  <img src="docs/panel.png" alt="Pervane menu bar panel: temperature and fan gauges, charging power, 30-minute temperature and fan chart, profile picker" width="340">
   &nbsp;&nbsp;
   <img src="docs/egri-duzenleyici.png" alt="Pervane profiles and curve editor in dark mode: draggable points with the live temperature on the curve" width="340">
 </p>
@@ -38,8 +38,9 @@ macOS spins the fan up late: the Mac heats up first, then cools down. Pervane dr
 | 🍃 **Hands off when cool** | When the curve says 0 %, the fan isn't held at minimum RPM; it's handed back to macOS (can be turned off in settings). |
 | 🚨 **Emergency brake** | Above a threshold the fan goes to full power whatever the profile, and stays there until things cool down by 8 °C. |
 | 🧈 **Smooth ramps** | At most 600 RPM change per tick; a hysteresis band keeps the fan from hunting up and down. |
+| ⚡ **Charging power** | With the charger plugged in: watts coming in from the charger, watts going into the battery, and the charger's rating. Tells you when the charger can't keep up and the battery is draining too. |
 | 📊 **30-minute history** | Temperature line and fan percentage in one chart; hover for the values at that moment. |
-| 🪶 **Quiet menu bar** | Icon, temperature, percentage or RPM: you choose what to show. Starts at login. |
+| 🪶 **Quiet menu bar** | Icon, temperature, percentage, RPM or charging watts: you choose what to show. Starts at login. |
 | ⌨️ **Command line** | `pervane`, `pervane izle` (watch), `pervane json` for scripts. |
 | 🛟 **Safe shutdown** | Whether the service stops or crashes, the fan is handed back to macOS. |
 

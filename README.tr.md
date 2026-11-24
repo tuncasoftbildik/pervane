@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/panel.png" alt="Pervane menü çubuğu paneli: sıcaklık ve fan halkaları, 30 dakikalık sıcaklık ve fan grafiği, profil seçici" width="340">
+  <img src="docs/panel.png" alt="Pervane menü çubuğu paneli: sıcaklık ve fan halkaları, şarj gücü, 30 dakikalık sıcaklık ve fan grafiği, profil seçici" width="340">
   &nbsp;&nbsp;
   <img src="docs/egri-duzenleyici.png" alt="Koyu temada Pervane profilleri ve eğri düzenleyicisi: sürüklenebilir noktalar, eğri üzerinde o anki sıcaklık" width="340">
 </p>
@@ -39,8 +39,9 @@ macOS fanı geç devreye sokar; Mac önce ısınır, sonra soğur. Pervane fanı
 | 🍃 **Soğukta sisteme bırakma** | Eğri %0 verdiğinde fan en düşük devirde tutulmaz, macOS'e bırakılır (ayarlardan kapatılır). |
 | 🚨 **Acil durum freni** | Eşik aşılınca profil ne olursa olsun tam güç; 8 °C soğuyana kadar bırakmaz. |
 | 🧈 **Yumuşak geçiş** | Tur başına en çok 600 devir; histerezis bandı sayesinde fan inip çıkıp durmaz. |
+| ⚡ **Şarj gücü** | Şarj aleti takılıyken: aletten giren watt, pile giden watt ve aletin gücü. Alet yetmeyip pilden de çekiliyorsa söyler. |
 | 📊 **30 dakikalık geçmiş** | Sıcaklık çizgisi ile fan yüzdesi aynı grafikte; üzerine gelince o anın değerleri. |
-| 🪶 **Sade menü çubuğu** | Simge, sıcaklık, yüzde ya da devir: hangisini görmek istediğini sen seç. Oturum açılınca kendiliğinden başlar. |
+| 🪶 **Sade menü çubuğu** | Simge, sıcaklık, yüzde, devir ya da şarj gücü: hangisini görmek istediğini sen seç. Oturum açılınca kendiliğinden başlar. |
 | ⌨️ **Komut satırı** | `pervane`, `pervane izle`, betikler için `pervane json`. |
 | 🛟 **Güvenli kapanış** | Servis dursa da çökse de fan sisteme geri verilir. |
 
