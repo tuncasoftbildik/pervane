@@ -35,6 +35,10 @@ public struct PowerInfo: Equatable, Sendable {
     public var isCharging: Bool
     public var fullyCharged: Bool
     public var percent: Int?
+    /// Pil sürücüsünün değerleri son tazelediği an (Unix sn). Sürücü dakikada bir tazeler.
+    public var updatedAt: Double?
+    /// Değerler son fiş değişikliğinden eski: alet değişti, ölçüm henüz gelmedi.
+    public var stale = false
 
     public init(inputWatts: Double? = nil, batteryWatts: Double? = nil, adapterWatts: Double? = nil,
                 isCharging: Bool = false, fullyCharged: Bool = false, percent: Int? = nil) {
@@ -55,7 +59,13 @@ public func readPower() -> PowerInfo? {
     var props: Unmanaged<CFMutableDictionary>?
     guard IORegistryEntryCreateCFProperties(service, &props, kCFAllocatorDefault, 0) == KERN_SUCCESS,
           let dict = props?.takeRetainedValue() as? [String: Any] else { return nil }
-    return PowerInfo(registry: dict)
+    guard var info = PowerInfo(registry: dict) else { return nil }
+    // Aletin gücünü güç kaynağı API'sinden al: fiş olayında hemen güncellenir, kayıt dakikada bir.
+    if let details = IOPSCopyExternalPowerAdapterDetails()?.takeRetainedValue() as? [String: Any],
+       let w = (details[kIOPSPowerAdapterWattsKey] as? NSNumber)?.doubleValue, w > 0 {
+        info.adapterWatts = w
+    }
+    return info
 }
 
 extension PowerInfo {
@@ -80,6 +90,7 @@ extension PowerInfo {
         isCharging = num(dict["IsCharging"])?.boolValue ?? false
         fullyCharged = num(dict["FullyCharged"])?.boolValue ?? false
         percent = num(dict["CurrentCapacity"])?.intValue
+        updatedAt = num(dict["UpdateTime"])?.doubleValue
     }
 }
 

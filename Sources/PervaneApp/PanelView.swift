@@ -135,11 +135,14 @@ struct StatusTab: View {
 
     /// Şarj aleti takılıyken: adaptörden giren güç büyük, pile giden ve aletin gücü altta.
     private func powerRow(_ p: PowerInfo) -> some View {
-        let charging = p.isCharging && (p.batteryWatts ?? 0) > 0.05
-        let draining = (p.batteryWatts ?? 0) < -0.05
+        let charging = !p.stale && p.isCharging && (p.batteryWatts ?? 0) > 0.05
+        let draining = !p.stale && (p.batteryWatts ?? 0) < -0.05
         let title: String
         var detail: [String] = []
-        if charging, let b = p.batteryWatts {
+        if p.stale {
+            title = "Şarj aleti değişti"
+            detail.append("ölçülüyor, bir dakika içinde gelir")
+        } else if charging, let b = p.batteryWatts {
             title = "Şarj oluyor"
             detail.append("pile \(wattText(b))")
         } else if draining, let b = p.batteryWatts {
@@ -163,7 +166,7 @@ struct StatusTab: View {
                 Text(detail.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
             Spacer(minLength: 4)
-            Text(p.inputWatts.map(wattText) ?? "–")
+            Text(p.stale ? "…" : p.inputWatts.map(wattText) ?? "–")
                 .font(.system(size: 22, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .contentTransition(.numericText())

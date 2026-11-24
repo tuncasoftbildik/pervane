@@ -1,4 +1,5 @@
 import AppKit
+import IOKit.ps
 import Foundation
 import PervaneCore
 
@@ -41,12 +42,15 @@ final class Model: ObservableObject {
     @Published var menuStyle: MenuStyle {
         didSet {
             UserDefaults.standard.set(menuStyle.rawValue, forKey: "menuStyle")
-            if menuStyle == .tempWatts { power = readPower() }
+            if menuStyle == .tempWatts { updatePower() }
             if let latest { publishTitle(latest) }
         }
     }
 
     private var latest: Status?
+    /// Son fiş takma/çıkarma ya da alet değişikliği anı.
+    private var powerChangedAt: Double = 0
+    private var powerSource: CFRunLoopSource?
     private var timer: Timer?
     private var pollCount = 0
     private var inFlight = false
@@ -66,6 +70,7 @@ final class Model: ObservableObject {
             publishTitle(s)
             return
         }
+        watchPowerSource()
         refresh()
         let t = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.poll() }
@@ -104,10 +109,7 @@ final class Model: ObservableObject {
             s.history = []
             latest = s
             // Güç yalnız gösterilecekse okunur: panel açıkken ya da menü çubuğunda isteniyorsa.
-            if panelVisible || menuStyle == .tempWatts {
-                let p = readPower()
-                if p != power { power = p }
-            }
+            if panelVisible || menuStyle == .tempWatts { updatePower() }
             publishTitle(s)
             if (panelVisible || status == nil), status != s { status = s }
         case .failure(let e):
@@ -145,7 +147,7 @@ final class Model: ObservableObject {
             t.text = s.fans.first.map { "\(temp) \(Int(($0.rpm / 50).rounded()) * 50)" } ?? temp
         case .tempWatts:
             // Tam sayı watt: menü çubuğunda ondalık her okumada oynar.
-            t.text = power?.inputWatts.map { "\(temp) \(Int($0.rounded()))W" } ?? temp
+            t.text = power.flatMap { $0.stale ? nil : $0.inputWatts }.map { "\(temp) \(Int($0.rounded()))W" } ?? temp
         }
         if s.emergency {
             t.level = 2
@@ -153,6 +155,34 @@ final class Model: ObservableObject {
             t.level = 1
         }
         if t != title { title = t }
+    }
+
+    private func updatePower() {
+        var p = readPower()
+        // Sürücü tazelemeden önceki değerler eski alete aittir.
+        if var q = p, let at = q.updatedAt, at < powerChangedAt {
+            q.stale = true
+            p = q
+        }
+        if p != power { power = p }
+    }
+
+    /// Fiş takılınca, çıkınca ya da alet değişince hemen haber al.
+    private func watchPowerSource() {
+        let context = Unmanaged.passUnretained(self).toOpaque()
+        guard let source = IOPSNotificationCreateRunLoopSource({ context in
+            guard let context else { return }
+            let model = Unmanaged<Model>.fromOpaque(context).takeUnretainedValue()
+            MainActor.assumeIsolated { model.powerSourceChanged() }
+        }, context)?.takeRetainedValue() else { return }
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .defaultMode)
+        powerSource = source
+    }
+
+    private func powerSourceChanged() {
+        powerChangedAt = Date().timeIntervalSince1970
+        updatePower()
+        if let latest { publishTitle(latest) }
     }
 
     /// Panel açıldı: beklemeden son bilinen durumu göster, sonra tazele.
