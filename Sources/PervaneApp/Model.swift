@@ -51,6 +51,7 @@ final class Model: ObservableObject {
     /// Son fiş takma/çıkarma ya da alet değişikliği anı.
     private var powerChangedAt: Double = 0
     private var powerSource: CFRunLoopSource?
+    private var lastAdapterKey = adapterKey()
     private var timer: Timer?
     private var pollCount = 0
     private var inFlight = false
@@ -180,6 +181,10 @@ final class Model: ObservableObject {
     }
 
     private func powerSourceChanged() {
+        // Bildirim pil yüzdesi ya da kalan süre değişince de gelir; yalnız alet değişince işaretle.
+        let key = adapterKey()
+        guard key != lastAdapterKey else { return updatePower() }
+        lastAdapterKey = key
         powerChangedAt = Date().timeIntervalSince1970
         updatePower()
         if let latest { publishTitle(latest) }
@@ -227,4 +232,11 @@ final class Model: ObservableObject {
 func fanPercent(_ f: FanState) -> Double {
     guard f.max > f.min else { return 0 }
     return min(100, max(0, (f.rpm - f.min) / (f.max - f.min) * 100))
+}
+
+/// Takılı aletin kimliği: takılı değilse boş. Değişince ölçüm yeniden beklenir.
+func adapterKey() -> String {
+    guard let d = IOPSCopyExternalPowerAdapterDetails()?.takeRetainedValue() as? [String: Any] else { return "" }
+    return [kIOPSPowerAdapterWattsKey, kIOPSPowerAdapterIDKey, kIOPSPowerAdapterFamilyKey, "Current", "AdapterVoltage"]
+        .map { "\(d[$0] ?? "")" }.joined(separator: "|")
 }
