@@ -4,7 +4,7 @@ import PervaneCore
 
 /// Menü çubuğunda ne gösterileceği.
 enum MenuStyle: String, CaseIterable, Identifiable {
-    case icon, temp, tempPercent, tempRPM
+    case icon, temp, tempPercent, tempRPM, tempWatts
 
     var id: String { rawValue }
 
@@ -14,6 +14,7 @@ enum MenuStyle: String, CaseIterable, Identifiable {
         case .temp: return "Simge ve sıcaklık"
         case .tempPercent: return "Sıcaklık ve fan yüzdesi"
         case .tempRPM: return "Sıcaklık ve devir"
+        case .tempWatts: return "Sıcaklık ve şarj gücü"
         }
     }
 }
@@ -33,11 +34,14 @@ final class Model: ObservableObject {
     @Published var status: Status?
     /// 30 dakikalık geçmiş; servisten yalnız yeni örnekler istenir.
     @Published var history: [Sample] = []
+    /// Şarj aleti takılıyken güç akışı; takılı değilse nil. Uygulama kendisi okur, servis gerekmez.
+    @Published var power: PowerInfo?
     @Published var title = MenuTitle()
     @Published var error: String?
     @Published var menuStyle: MenuStyle {
         didSet {
             UserDefaults.standard.set(menuStyle.rawValue, forKey: "menuStyle")
+            if menuStyle == .tempWatts { power = readPower() }
             if let latest { publishTitle(latest) }
         }
     }
@@ -56,6 +60,7 @@ final class Model: ObservableObject {
             var s = snapshot
             history = s.history
             s.history = []
+            power = readPower()
             status = s
             latest = s
             publishTitle(s)
@@ -98,6 +103,11 @@ final class Model: ObservableObject {
             merge(s.history)
             s.history = []
             latest = s
+            // Güç yalnız gösterilecekse okunur: panel açıkken ya da menü çubuğunda isteniyorsa.
+            if panelVisible || menuStyle == .tempWatts {
+                let p = readPower()
+                if p != power { power = p }
+            }
             publishTitle(s)
             if (panelVisible || status == nil), status != s { status = s }
         case .failure(let e):
@@ -133,6 +143,9 @@ final class Model: ObservableObject {
         case .tempRPM:
             // 50'ye yuvarla: devir her okumada birkaç birim oynar, yazı durmadan değişmesin.
             t.text = s.fans.first.map { "\(temp) \(Int(($0.rpm / 50).rounded()) * 50)" } ?? temp
+        case .tempWatts:
+            // Tam sayı watt: menü çubuğunda ondalık her okumada oynar.
+            t.text = power?.inputWatts.map { "\(temp) \(Int($0.rounded()))W" } ?? temp
         }
         if s.emergency {
             t.level = 2

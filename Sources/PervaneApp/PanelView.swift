@@ -75,6 +75,7 @@ struct StatusTab: View {
         VStack(alignment: .leading, spacing: 12) {
             gauges
             chips
+            if let p = model.power { powerRow(p) }
             banner
             HistoryChart(samples: model.history, fan: s.fans.first, emergency: s.config.emergencyTemp)
                 .card()
@@ -130,6 +131,46 @@ struct StatusTab: View {
                  tint: s.onBattery ? .orange : .green)
             Spacer(minLength: 0)
         }
+    }
+
+    /// Şarj aleti takılıyken: adaptörden giren güç büyük, pile giden ve aletin gücü altta.
+    private func powerRow(_ p: PowerInfo) -> some View {
+        let charging = p.isCharging && (p.batteryWatts ?? 0) > 0.05
+        let draining = (p.batteryWatts ?? 0) < -0.05
+        let title: String
+        var detail: [String] = []
+        if charging, let b = p.batteryWatts {
+            title = "Şarj oluyor"
+            detail.append("pile \(wattText(b))")
+        } else if draining, let b = p.batteryWatts {
+            title = "Şarj aleti yetmiyor"
+            detail.append("pilden de \(wattText(b))")
+        } else if p.fullyCharged || (p.percent ?? 0) >= 100 {
+            title = "Pil dolu"
+            detail.append("güç doğrudan sisteme")
+        } else {
+            title = "Adaptöre bağlı"
+            detail.append("şarj beklemede")
+        }
+        if let a = p.adapterWatts { detail.append("\(Int(a.rounded())) W'lık alet") }
+        return HStack(spacing: 10) {
+            Image(systemName: charging ? "bolt.fill" : draining ? "bolt.trianglebadge.exclamationmark.fill" : "powerplug.fill")
+                .font(.system(size: 18))
+                .foregroundStyle(charging ? Color.green : draining ? Color.orange : Color.secondary)
+                .frame(width: 22)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(.callout)
+                Text(detail.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+            }
+            Spacer(minLength: 4)
+            Text(p.inputWatts.map(wattText) ?? "–")
+                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .contentTransition(.numericText())
+                .help("Şarj aletinden o an giren güç")
+        }
+        .card()
+        .animation(.default, value: p.inputWatts.map { Int($0.rounded()) })
     }
 
     /// Fanı kimin, neden yönettiğini tek satırda söyler.
